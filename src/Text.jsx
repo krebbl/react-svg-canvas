@@ -12,7 +12,7 @@ export default class Text extends Element {
   static defaultProps = Object.assign({}, Element.defaultProps, {
     text: '',
     fontSize: 12,
-    fontFamily: 'Leckerli One',
+    fontFamily: 'Verdana',
     verticalAlign: 'top',
     lineHeight: 2,
     textAlign: 'left',

@@ -12,7 +12,7 @@ export default class Text extends Element {
   static defaultProps = Object.assign({}, Element.defaultProps, {
     text: '',
     fontSize: 12,
-    fontFamily: 'sans-serif',
+    fontFamily: 'Leckerli One',
     verticalAlign: 'top',
     lineHeight: 2,
     textAlign: 'left',
@@ -169,25 +169,25 @@ export default class Text extends Element {
     if (lines.length === 0) {
       return null;
     }
-    let y = 2, dy;
+    let y = 2;
+    const dy = 0;
     switch (this.props.verticalAlign) {
       case 'top':
-        dy = this.props.fontSize;
         break;
       case 'bottom':
-        dy = this.props.fontSize;
         y = -this.state.measurement.height;
         if (this.props.height) {
           y += this.props.height;
         }
         break;
       case 'middle':
-        dy = this.props.fontSize;
         y = -this.state.measurement.height * 0.5;
         if (this.props.height) {
           y += this.props.height * 0.5;
         }
         break;
+      default:
+            break;
     }
     return (<g
       transform={`translate(${this.props.padding}, ${y})`}
@@ -199,7 +199,7 @@ export default class Text extends Element {
       <rect width={this.props.width} height={this.state.measurement.height} fill="transparent" />
       {lines.map((line, i) => {
         return <text
-          key={i} xmlSpace="preserve" className="no-select" style={textStyle} fontFamily={this.props.fontFamily} fontSize={this.props.fontSize}
+          key={i} xmlSpace="preserve" dominantBaseline="text-before-edge" className="no-select" style={textStyle} fontFamily={this.props.fontFamily} fontSize={this.props.fontSize}
           dy={dy} x={line.xs.join(' ')} y={line.ys[0] - this.state.measurement.firstLineOffset} fill={this.state.editing ? 'transparent' : this.props.fill}
         >{line.text || ' '}</text>;
       })}
@@ -273,7 +273,10 @@ function measureText(options) {
     lastY = y;
   });
 
+  firstLineOffset = firstLineOffset || 0;
+
   return {
+    firstLineHeight: lines.length > 0 ? lines[0].height : 0,
     firstLineOffset: firstLineOffset,
     height: divWrapper.offsetHeight - (2 * firstLineOffset),
     lines

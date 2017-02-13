@@ -52,18 +52,31 @@ export default class TextEditor extends React.Component {
     if (!this._target) {
       this._target = document.createElement('div');
       document.body.appendChild(this._target);
-      this._target.style.position = 'absolute';
-      this._target.style.top = `${document.body.scrollTop}px`;
-      this._target.style.left = '0';
-      this._target.style.background = 'transparent';
+
+      const style = this._target.style;
+      style.position = 'absolute';
+      style.top = `${document.body.scrollTop}px`;
+      style.left = '0';
+      style.background = 'transparent';
       // this._target.style.overflow = 'hidden';
-      this._target.style.zIndex = '1000';
-      this._target.style.outline = 'none';
-      this._target.style.whiteSpace = 'pre-wrap';
-      this._target.style.border = 'none';
-      this._target.style.wordBreak = isFirefox ? 'break-all' : 'break-word'; // FF can't do 'break-word'
-      this._target.style.padding = 'none';
-      this._target.style.transformOrigin = '0 0';
+      style.zIndex = '1000';
+      style.outline = 'none';
+      style.whiteSpace = 'pre-wrap';
+      style.border = 'none';
+      style.wordBreak = isFirefox ? 'break-all' : 'break-word'; // FF can't do 'break-word'
+      style.padding = 'none';
+      style.transformOrigin = '0 0';
+      style.fontKerning = 'none';
+      style.fontVariantLigatures = 'no-common-ligatures';
+      style.fontFeatureSettings = '\'kern\' 0,\'liga\' 0,\'clig\' 0';
+
+      /*
+      TODO:
+       font-kerning: none;
+       font-variant-ligatures: no-common-ligatures;
+       font-feature-settings: 'kern' 0,'liga' 0,'clig' 0;
+       font-synthesis: none;
+       */
       this._target.setAttribute('contenteditable', 'true');
       this._target.onkeyup = (e) => {
         this.props.onTextChange && this.props.onTextChange(e);
@@ -93,7 +106,7 @@ export default class TextEditor extends React.Component {
 
     const topTranslate = this.props.fontSize / 12 * (isFirefox ? 2 : 1);
 
-    target.style.transform = `matrix(${[val.a, val.b, val.c, val.d, val.e, val.f].join(',')}) translate(0,${topTranslate}px)`;
+    target.style.transform = `matrix(${[val.a, val.b, val.c, val.d, val.e, val.f].join(',')}) translate(0,${0}px)`;
     target.focus();
   }
   componentWillUnmount() {
@@ -118,7 +131,7 @@ export default class TextEditor extends React.Component {
 
       const topTranslate = this.props.fontSize / 12;
 
-      this._target.style.transform = `matrix(${[val.a, val.b, val.c, val.d, val.e, val.f].join(',')}) translate(0,${topTranslate}px)`;
+      this._target.style.transform = `matrix(${[val.a, val.b, val.c, val.d, val.e, val.f].join(',')}) translate(0,${0}px)`;
     }
   }
 

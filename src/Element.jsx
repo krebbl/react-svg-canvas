@@ -1,6 +1,8 @@
-import React, {PropTypes} from "react";
-import objectDiff from "object-diff";
-import shallowequal from "shallowequal";
+import React, {PropTypes} from 'react';
+import objectDiff from 'object-diff';
+import shallowequal from 'shallowequal';
+import Api from './Api';
+import Selection from './Selection';
 
 export default class Element extends React.Component {
 
@@ -11,6 +13,7 @@ export default class Element extends React.Component {
   };
 
   static propTypes = {
+    _id: PropTypes.string,
     x: PropTypes.number,
     y: PropTypes.number,
     width: PropTypes.number,
@@ -18,13 +21,9 @@ export default class Element extends React.Component {
     rotate: PropTypes.number,
     children: PropTypes.node,
     movable: PropTypes.bool,
+    moveDelegate: PropTypes.instanceOf(Element),
     selectable: PropTypes.bool,
-    scalable: PropTypes.bool,
-    bindProps: PropTypes.oneOfType([
-      React.PropTypes.string,
-      React.PropTypes.array
-    ]),
-    onChange: PropTypes.func
+    scalable: PropTypes.bool
   };
 
   static defaultProps = {
@@ -40,8 +39,8 @@ export default class Element extends React.Component {
   type = 'core';
 
   static contextTypes = {
-    api: PropTypes.object,
-    slide: PropTypes.object,
+    api: PropTypes.instanceOf(Api),
+    canvas: PropTypes.object,
     parentElement: PropTypes.object
   };
 
@@ -83,12 +82,20 @@ export default class Element extends React.Component {
     return knobs;
   }
 
-  getSelection() {
-    const svgRoot = this.context.slide.selections;
+  handleKnobChange = (knob, diffVector) => {
+    this.processKnobChange(knob, diffVector);
+  };
+
+  createSelection() {
+    const selectionContainer = this.context.canvas.selections;
+    if (!selectionContainer || this.state.moving) {
+      return null;
+    }
+    const svgRoot = selectionContainer;
     const node = this.bboxNode;
     const val = svgRoot.getCTM().inverse().multiply(node.getCTM());
 
-    return {
+    const props = {
       x: this.state.bboxX,
       y: this.state.bboxY,
       width: Math.ceil(this.props.width || this.state.width || 0),
@@ -96,12 +103,12 @@ export default class Element extends React.Component {
       matrix: val,
       transform: `matrix(${[val.a, val.b, val.c, val.d, val.e, val.f].join(',')})`,
       type: this.type,
-      id: this.id,
       editor: this.createEditor(),
       form: this.getForm(),
       knobs: this.getKnobs(),
-      show: !this.state.moving
+      onKnobChange: this.handleKnobChange
     };
+    return <Selection key={this.id} element={this} {...props} />;
   }
 
   createEditor() {
@@ -123,22 +130,26 @@ export default class Element extends React.Component {
       if (/^(x|y|xy|yx)$/.test(diffKeys)) {
         this.applyBBox(true);
       } else {
-        this.applyTransformation(prevProps.rotate !== this.props.rotate || prevProps.x !== this.props.x || prevProps.y !== this.props.y);
+        this.applyTransformation(prevProps.rotate !== this.props.rotate
+          || prevProps.x !== this.props.x || prevProps.y !== this.props.y);
       }
     } else {
-      const sizeChanged = this.state.width !== prevState.width || this.state.height !== prevState.height
-        || this.state.bboxX !== prevState.bboxX || this.state.bboxY !== prevState.bboxY;
+      const sizeChanged = this.state.width !== prevState.width
+        || this.state.height !== prevState.height
+        || this.state.bboxX !== prevState.bboxX
+        || this.state.bboxY !== prevState.bboxY;
       if (sizeChanged) {
-        this.notifyParent();
+        this.notifySizeChanged();
       }
     }
     if (prevState.moving !== this.state.moving) {
-      this.context.api.selectionChanged();
+      this.context.api.updateSelection(this);
     }
   }
 
   componentDidMount() {
     this.applyTransformation(true);
+    this.context.api.updateSelection(this);
   }
 
   applyBBox(positionChanged) {
@@ -158,19 +169,12 @@ export default class Element extends React.Component {
         height
       });
     } else if (positionChanged) {
-      this.notifyParent();
+      this.notifySizeChanged();
     }
   }
 
   applyTransformation(positionChanged) {
-    if (this.props.width == null || this.props.height == null) {
-      setTimeout(() => {
-        this.firstRender = false;
-        this.applyBBox(positionChanged);
-      }, this.firstRender ? 400 : 10);
-    } else {
-      this.applyBBox(positionChanged);
-    }
+    this.applyBBox(positionChanged);
   }
 
   calcBBox() {
@@ -189,7 +193,7 @@ export default class Element extends React.Component {
   }
 
   svgRoot() {
-    return this.context.slide.svgRoot;
+    return this.node.viewportElement;
   }
 
   calcNewPosition(x = 0, y = 0, xDiff = 0, yDiff = 0) {
@@ -204,8 +208,8 @@ export default class Element extends React.Component {
     let oldPoint = this.svgRoot().createSVGPoint();
     oldPoint.x = x - (width * 0.5);
     oldPoint.y = y - (height * 0.5);
-    let fx = oldPoint.x < 0 ? 1 : -1;
-    let fy = oldPoint.y < 0 ? 1 : -1;
+    const fx = oldPoint.x < 0 ? 1 : -1;
+    const fy = oldPoint.y < 0 ? 1 : -1;
     oldPoint = oldPoint.matrixTransform(transform.matrix);
 
     return {
@@ -250,9 +254,10 @@ export default class Element extends React.Component {
   processChange(key, value, trigger = true) {
     if (this.id) {
       if (key === 'rotate') {
-        value = value % 360;
+        this.context.api.updateElement(this.id, key, value % 360);
+      } else {
+        this.context.api.updateElement(this.id, key, value);
       }
-      this.context.api.updateElement(this.id, key, value);
       if (trigger) {
         this.context.api.dataChanged();
       }
@@ -264,7 +269,7 @@ export default class Element extends React.Component {
     this.mouseMoved = false;
     if (this.props.selectable) {
       e.stopPropagation();
-      this.context.api.selectNode(this, e);
+      this.context.api.selectNode(this);
       if (this.props.movable) {
         this.handleDragStart(e);
       } else if (this.props.moveDelegate) {
@@ -274,7 +279,7 @@ export default class Element extends React.Component {
   };
   handleDragStart = (e) => {
     e.preventDefault();
-    const svgRoot = this.context.slide.svgRoot;
+    const svgRoot = this.context.canvas.svgRoot;
     const event = e.nativeEvent;
     const pt = svgRoot.createSVGPoint();
     pt.x = event.pageX;
@@ -295,8 +300,8 @@ export default class Element extends React.Component {
   onDrag = (e) => {
     if (this.movePoint) {
       e.stopPropagation();
-      if(!this.isSelected()) {
-        this.context.api.selectNode(this, e);
+      if (!this.isSelected()) {
+        this.context.api.selectNode(this);
       }
 
       const changedEvent = e.touches ? e.touches[0] : e;
@@ -304,7 +309,7 @@ export default class Element extends React.Component {
       this.movePoint.y = changedEvent.pageY;
       const p = this.movePoint.matrixTransform(this.node.parentNode.getScreenCTM().inverse());
 
-      this.setState({ moving: true });
+      this.setState({moving: true});
       this.processChange('x', this.startX + (p.x - this.startPoint.x), false);
       this.processChange('y', this.startY + (p.y - this.startPoint.y));
     }
@@ -334,10 +339,8 @@ export default class Element extends React.Component {
     return this.context.api.isNodeSelected(this);
   }
 
-  notifyParent() {
-    if (this.isSelected()) {
-      this.context.api.selectNode(this);
-    }
+  notifySizeChanged() {
+    this.context.api.updateSelection(this);
     this.context.parentElement && this.context.parentElement.childSizeChanged();
   }
 

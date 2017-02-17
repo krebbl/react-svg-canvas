@@ -1,10 +1,13 @@
-import React, {PropTypes} from "react";
-import Element from "./Element";
-import TextEditor from "./TextEditor";
-import "./css/common.css";
-
-const textStyle = {whiteSpace: 'pre', textRendering: 'optimizeSpeed'};
+import React, {PropTypes} from 'react';
+import Element from './Element';
+import TextEditor from './TextEditor';
+// whiteSpace: 'pre', textRendering: 'geometricPrecision'
+const textStyle = {};
 const wrapProperties = ['text', 'fontSize', 'fontFamily', 'verticalAlign', 'lineHeight', 'textAlign', 'width', 'padding'];
+const isFirefox = navigator.userAgent.toLowerCase().indexOf('firefox') > -1;
+const isChrome = /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor);
+const isSafari = /Safari/.test(navigator.userAgent) && /Apple Computer/.test(navigator.vendor);
+
 export default class Text extends Element {
 
   type = 'text';
@@ -14,7 +17,7 @@ export default class Text extends Element {
     fontSize: 12,
     fontFamily: 'Verdana',
     verticalAlign: 'top',
-    lineHeight: 2,
+    lineHeight: 1.3,
     textAlign: 'left',
     fill: 'black',
     padding: 2,
@@ -56,7 +59,7 @@ export default class Text extends Element {
 
   processChange(key, value, trigger = true) {
     if (key === 'text' && !this.props.height) {
-      const height = measureNewHeight(Object.assign({}, this.props, { text: value, width: (this.props.width || 10) - (this.props.padding * 2) }));
+      const height = measureNewHeight(Object.assign({}, this.props, {text: value, width: (this.props.width || 10) - (this.props.padding * 2)}));
       const oldHeight = this.state.measurement.height;
       if (height - oldHeight !== 0) {
         const np = this.calcNewPosition(0, 0, 0, height - oldHeight);
@@ -72,14 +75,23 @@ export default class Text extends Element {
       let key = wrapProperties[i];
       if (nextProps[key] !== this.props[key]) {
         this.setState({
-          measurement: measureText(Object.assign({}, nextProps, {width: (nextProps.width || 10) - (this.props.padding * 2) }))
+          measurement: measureText(Object.assign({}, nextProps, {width: (nextProps.width || 10) - (nextProps.padding * 2)}))
         });
         break;
       }
     }
   }
 
+  componentDidMount() {
+    this.wrapText();
+    super.componentDidMount();
+  }
+
   componentDidUpdate(prevProps, prevState) {
+    if (this.state.measurement !== prevState.measurement) {
+      this.wrapText();
+    }
+
     super.componentDidUpdate(prevProps, prevState);
 
     if (this.state.editing !== prevState.editing) {
@@ -95,6 +107,54 @@ export default class Text extends Element {
       setTimeout(() => {
         this.textEditor && this.textEditor.repositionTextArea();
       }, 1);
+    }
+  }
+
+  wrapText() {
+    const rects = this.state.measurement.rects;
+    let textContent = this.props.text;
+    const svgRoot = this.svgRoot();
+    const p = svgRoot.createSVGPoint();
+
+    if (rects) {
+      let rect;
+      let textNode;
+      const mearureTreshhold = this.props.fontSize * 0.1;
+      let num;
+      let lastTop = rects[0].top;
+      let hardLines = textContent.split('\n');
+      let hardLineIndex = 0;
+      let lastLineIndex = hardLineIndex;
+      let currentLine = hardLines[hardLineIndex];
+      for (let i = 0; i < rects.length; i++) {
+        rect = rects[i];
+        textNode = this.textWrapperNode.childNodes[i];
+        textNode.removeAttributeNS(null, 'x');
+        textNode.removeAttributeNS(null, 'y');
+        // if we have a softbreak delete all leading spaces
+        if (lastLineIndex === hardLineIndex && lastTop !== rect.top) {
+          currentLine = currentLine.replace(/^\s+/, '');
+        }
+        textNode.textContent = currentLine;
+
+        p.y = rect.height * 0.5;
+        p.x = rect.width > mearureTreshhold ? rect.width - mearureTreshhold : rect.width;
+        lastLineIndex = hardLineIndex;
+
+        num = textNode.getCharNumAtPosition(p);
+        if (num > -1) {
+          textNode.textContent = currentLine.substr(0, num + 1);
+          currentLine = currentLine.substr(num + 1);
+        }
+
+        if (num < 0 || (isFirefox && !currentLine)) {
+          hardLineIndex += 1;
+          currentLine = hardLines[hardLineIndex];
+        }
+        textNode.setAttributeNS(null, 'x', rect.left);
+        textNode.setAttributeNS(null, 'y', rect.top - (isSafari || isChrome ? lastLineIndex * 0.75 : 0));
+        lastTop = rect.top;
+      }
     }
   }
 
@@ -124,7 +184,7 @@ export default class Text extends Element {
         x={this.props.padding} y={this.props.padding - this.state.measurement.firstLineOffset}
         onTextChange={this.handleTextChange}
         onBlur={this.handleTextBlur}
-        width={(this.props.width || this.state.width || 0) - (this.props.padding * 2)}
+        width={(this.props.width || this.state.width || 0) - (this.props.padding * 2) - 0.01}
         height={(this.state.height || 0) - (this.props.padding * 2)}
         text={this.props.text} fill="blue"
       />;
@@ -133,7 +193,10 @@ export default class Text extends Element {
     }
   }
 
-  handleTextDown = () => {
+  handleTextDown = (e) => {
+    if (this.state.editable) {
+      e.stopPropagation();
+    }
     if (this.props.editable && this.context.api.isNodeSelected(this)) {
       this.textDownTime = new Date().getTime();
     }
@@ -146,6 +209,10 @@ export default class Text extends Element {
       }
     }
   };
+
+  handleTextWrapperRef = (ref) => {
+    this.textWrapperNode = ref;
+  }
 
   getForm() {
     return [{
@@ -165,8 +232,8 @@ export default class Text extends Element {
 
   renderChildren() {
     // wrap lines
-    const lines = this.state.measurement.lines;
-    if (lines.length === 0) {
+    const rects = this.state.measurement.rects;
+    if (rects.length === 0) {
       return null;
     }
     let y = 2;
@@ -187,7 +254,7 @@ export default class Text extends Element {
         }
         break;
       default:
-            break;
+        break;
     }
     return (<g
       transform={`translate(${this.props.padding}, ${y})`}
@@ -196,13 +263,15 @@ export default class Text extends Element {
       onMouseUp={this.handleTextUp}
       onTouchEnd={this.handleTextUp}
     >
-      <rect width={this.props.width} height={this.state.measurement.height} fill="transparent" />
-      {lines.map((line, i) => {
-        return <text
-          key={i} xmlSpace="preserve" dominantBaseline="text-before-edge" className="no-select" style={textStyle} fontFamily={this.props.fontFamily} fontSize={this.props.fontSize}
-          dy={dy} x={line.xs.join(' ')} y={line.ys[0] - this.state.measurement.firstLineOffset} fill={this.state.editing ? 'transparent' : this.props.fill}
-        >{line.text || ' '}</text>;
-      })}
+      <rect width={this.props.width} height={this.state.measurement.height} fill="transparent"/>
+      <g ref={this.handleTextWrapperRef}>
+        {rects.map((line, i) => {
+          return <text
+            key={i} xmlSpace="preserve" dominantBaseline="text-before-edge" className="no-select" style={textStyle} fontFamily={this.props.fontFamily} fontSize={this.props.fontSize}
+            dy={dy} y={line.top - this.state.measurement.firstLineOffset} fill={this.state.editing ? 'transparent' : this.props.fill}
+          />;
+        })}
+      </g>
     </g>);
   }
 
@@ -211,80 +280,67 @@ export default class Text extends Element {
 
 var divWrapper;
 function createDivWrapper() {
+  const outsideWrapper = document.createElement("div");
+  outsideWrapper.style.position = 'absolute';
+  outsideWrapper.style.width = '100px';
+  outsideWrapper.style.height = '100px';
+  outsideWrapper.style.overflow = 'hidden';
+  outsideWrapper.style.zIndex = '-1';
+
+
   const ret = document.createElement('div');
   ret.style.position = 'absolute';
   ret.style.zIndex = '-1';
   ret.style.whiteSpace = 'pre-wrap';
-  const isFirefox = navigator.userAgent.toLowerCase().indexOf('firefox') > -1;
-  ret.style.wordBreak = isFirefox ? 'break-all' : 'break-word'; // FF can't do 'break-word'
-  document.body.appendChild(ret);
+  ret.style.wordWrap = 'break-word';
+  ret.style.wordBreak = 'break-word'; // for FF
+
+  outsideWrapper.appendChild(ret);
+  document.body.appendChild(outsideWrapper);
 
   return ret;
 }
 
+const measureScaleFactor = 4;
+
 function prepareDivWrapper(options) {
-  const { text, fontSize, fontFamily, width, textAlign, lineHeight } = options;
+  const {text, fontSize, fontFamily, width, textAlign, lineHeight} = options;
 
   divWrapper = divWrapper || createDivWrapper();
   divWrapper.innerHTML = '';
   divWrapper.style.fontFamily = fontFamily;
   divWrapper.style.lineHeight = lineHeight;
-  divWrapper.style.fontSize = `${fontSize}px`;
-  divWrapper.style.width = `${width}px`;
+  divWrapper.style.fontSize = `${fontSize * measureScaleFactor}px`;
+  divWrapper.style.width = `${width * measureScaleFactor}px`;
   divWrapper.style.color = 'transparent';
   divWrapper.style.textAlign = textAlign;
-  divWrapper.innerHTML = `<span>${text.split('').join('</span><span>').replace(/^\s/gi, '&nbsp;').replace(/\n/gi, '<br/>')}</span>`;
+  divWrapper.innerHTML = `<span>${text.replace(/\n/gi, '<br/>')}</span>`;
 
   return divWrapper;
 }
 
 function measureText(options) {
-  var x, y, height, rect;
-
   divWrapper = prepareDivWrapper(options);
-
-  const lines = [];
-  let lastY;
-  let currentLine;
-  let firstLineOffset;
-
-  [].forEach.call(divWrapper.childNodes, function (el) {
-    rect = el.getBoundingClientRect();
-    x = rect.left;
-    y = el.offsetTop;
-    height = el.offsetHeight;
-    if (lastY === null || lastY !== y) {
-      currentLine = {
-        text: '',
-        xs: [],
-        ys: []
-      };
-      lines.push(currentLine);
-    }
-
-    if (firstLineOffset == null) {
-      firstLineOffset = y;
-    }
-
-    currentLine.text += el.textContent;
-    currentLine.xs.push(x);
-    currentLine.ys.push(y);
-    currentLine.height = height;
-    lastY = y;
-  });
-
-  firstLineOffset = firstLineOffset || 0;
+  const rects = divWrapper.firstChild.getClientRects();
+  const topRect = divWrapper.getBoundingClientRect();
+  const firstLineOffset = divWrapper.firstChild.offsetTop;
 
   return {
-    firstLineHeight: lines.length > 0 ? lines[0].height : 0,
-    firstLineOffset: firstLineOffset,
-    height: divWrapper.offsetHeight - (2 * firstLineOffset),
-    lines
+    height: (divWrapper.offsetHeight - (2 * firstLineOffset)) / measureScaleFactor,
+    firstLineOffset: firstLineOffset / measureScaleFactor,
+    rects: [].map.call(rects, (rect) => {
+      return {
+        left: (rect.left - topRect.left) / measureScaleFactor,
+        top: (rect.top - topRect.top - firstLineOffset) / measureScaleFactor,
+        width: rect.width / measureScaleFactor,
+        height: rect.height / measureScaleFactor
+      };
+    })
   };
 }
 
 function measureNewHeight(options) {
   divWrapper = prepareDivWrapper(options);
   const firstLineOffset = divWrapper.firstChild.offsetTop;
-  return divWrapper.offsetHeight - (2 * firstLineOffset);
+  return (divWrapper.offsetHeight - (2 * firstLineOffset)) / measureScaleFactor;
 }

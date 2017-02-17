@@ -1,11 +1,11 @@
 /* eslint-disable global-require, import/no-unresolved, react/no-multi-comp */
-import React from "react";
-import ReactDOM from "react-dom";
-import GithubCorner from "react-github-corner";
-import {Catalog, CodeSpecimen, ReactSpecimen} from "catalog";
-import "purecss/build/pure.css";
-import "./main.css";
-import "../style.css";
+import React from 'react';
+import ReactDOM from 'react-dom';
+import GithubCorner from 'react-github-corner';
+import {Catalog, CodeSpecimen, ReactSpecimen} from 'catalog';
+import 'purecss/build/pure.css';
+import './main.css';
+import '../style.css';
 
 // Add your documentation imports here. These are available to
 // React specimen. Do NOT pass React here as Catalog does that.
@@ -22,10 +22,23 @@ const pages = [
     path: '/demo',
     title: 'Demo',
     component: require('../examples/Examples')
+  },
+  {
+    title: 'Components',
+    path: '/components',
+    pages: [
+      {
+        path: '/components/element',
+        title: 'Element'
+      },
+      {
+        path: '/components/text',
+        title: 'Text'
+      }
+    ]
   }
 ];
 
-// Catalog - logoSrc="../images/logo.png"
 ReactDOM.render(
   <div>
     <GithubCorner

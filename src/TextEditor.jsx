@@ -1,4 +1,4 @@
-import React, {PropTypes} from "react";
+import React, {PropTypes} from 'react';
 
 const wrapProperties = ['text', 'fontSize', 'fontFamily', 'verticalAlign', 'lineHeight', 'textAlign', 'width'];
 const isFirefox = navigator.userAgent.toLowerCase().indexOf('firefox') > -1;
@@ -27,6 +27,10 @@ export default class TextEditor extends React.Component {
     lineHeight: PropTypes.number
   };
 
+  static contextTypes = {
+    canvas: PropTypes.object
+  };
+
 
 
   componentDidMount() {
@@ -51,39 +55,32 @@ export default class TextEditor extends React.Component {
 
     if (!this._target) {
       this._target = document.createElement('div');
-      document.body.appendChild(this._target);
+      this.context.canvas.wrapperNode.appendChild(this._target);
 
       const style = this._target.style;
       style.position = 'absolute';
-      style.top = `${document.body.scrollTop}px`;
+      style.top = '0';
       style.left = '0';
       style.background = 'transparent';
-      // this._target.style.overflow = 'hidden';
       style.zIndex = '1000';
       style.outline = 'none';
       style.whiteSpace = 'pre-wrap';
       style.border = 'none';
-      style.wordBreak = isFirefox ? 'break-all' : 'break-word'; // FF can't do 'break-word'
+      style.wordBreak = 'break-word';
+      style.wordWrap = 'break-word'; // for FF
       style.padding = 'none';
       style.transformOrigin = '0 0';
-      style.fontKerning = 'none';
-      style.fontVariantLigatures = 'no-common-ligatures';
-      style.fontFeatureSettings = '\'kern\' 0,\'liga\' 0,\'clig\' 0';
 
-      /*
-      TODO:
-       font-kerning: none;
-       font-variant-ligatures: no-common-ligatures;
-       font-feature-settings: 'kern' 0,'liga' 0,'clig' 0;
-       font-synthesis: none;
-       */
       this._target.setAttribute('contenteditable', 'true');
       this._target.onkeyup = (e) => {
         this.props.onTextChange && this.props.onTextChange(e);
       };
+      this._target.onchange = (e) => {
+        this.props.onTextChange && this.props.onTextChange(e);
+      };
 
       this._target.onblur = () => {
-        // this.props.onBlur && this.props.onBlur();
+        this.props.onBlur && this.props.onBlur();
       };
     }
 
@@ -98,15 +95,10 @@ export default class TextEditor extends React.Component {
       }
     });
 
-    // target.style.height = `${this.props.height}px`;
     if (this.props.text !== target.textContent) {
       target.textContent = this.props.text;
     }
-    const val = this.node.getScreenCTM();
-
-    const topTranslate = this.props.fontSize / 12 * (isFirefox ? 2 : 1);
-
-    target.style.transform = `matrix(${[val.a, val.b, val.c, val.d, val.e, val.f].join(',')}) translate(0,${0}px)`;
+    this.positionEditable(target);
     target.focus();
   }
   componentWillUnmount() {
@@ -126,12 +118,13 @@ export default class TextEditor extends React.Component {
   };
 
   repositionTextArea() {
-    if(this._target) {
-      const val = this.node.getScreenCTM();
+    this.positionEditable(this._target);
+  }
 
-      const topTranslate = this.props.fontSize / 12;
-
-      this._target.style.transform = `matrix(${[val.a, val.b, val.c, val.d, val.e, val.f].join(',')}) translate(0,${0}px)`;
+  positionEditable(editable) {
+    if (editable) {
+      const val = this.node.getCTM();
+      editable.style.transform = `matrix(${[val.a, val.b, val.c, val.d, val.e, val.f].join(',')})`;
     }
   }
 
@@ -146,7 +139,13 @@ export default class TextEditor extends React.Component {
   render() {
     return <g transform={`translate(${this.props.x || 0}, ${this.props.y || 0})`}>
       {this.state.active ?
-      <rect ref={this.handleRef} style={{pointerEvent: 'none'}} fill="transparent" width={this.props.width} height={this.props.height}/> : null}
+        <rect
+          ref={this.handleRef}
+          style={{pointerEvent: 'none'}}
+          fill="transparent"
+          width={this.props.width}
+          height={this.props.height}
+        /> : null}
     </g>;
   }
 }

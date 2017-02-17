@@ -43,25 +43,25 @@ const knobs = [
 export default class Selection extends React.Component {
 
   static propTypes = {
-    selection: PropTypes.object
+    onKnobChange: PropTypes.func
   };
 
-  static defaultProps = {
-    selection: null
-  };
+  static defaultProps = {};
 
   static contextTypes = {
     zoom: PropTypes.number,
-    slide: PropTypes.object,
+    canvas: PropTypes.object,
     api: PropTypes.object
   };
 
   handleStartDrag = (e) => {
     this.activeKnob = e.target.props.knob;
     this.lastPoint = e.startPoint;
-    this.knobPoint = this.context.slide.svgRoot.createSVGPoint();
-    this.rootPoint = this.context.slide.svgRoot.createSVGPoint();
-    this.scalePoint = this.context.slide.svgRoot.createSVGPoint();
+    const svgRoot = this.context.canvas.svgRoot;
+    
+    this.knobPoint = svgRoot.createSVGPoint();
+    this.rootPoint = svgRoot.createSVGPoint();
+    this.scalePoint = svgRoot.createSVGPoint();
     e.nativeEvent.stopPropagation();
   };
 
@@ -71,20 +71,20 @@ export default class Selection extends React.Component {
     this.knobPoint.y = activeKnob.direction.y * 100;
     this.rootPoint.x = 0;
     this.rootPoint.y = 0;
-    const tp = this.knobPoint.matrixTransform(this.props.selection.matrix);
-    const rp = this.rootPoint.matrixTransform(this.props.selection.matrix);
+    const tp = this.knobPoint.matrixTransform(this.props.matrix);
+    const rp = this.rootPoint.matrixTransform(this.props.matrix);
     this.scalePoint.x = e.point.x - this.lastPoint.x;
     this.scalePoint.y = e.point.y - this.lastPoint.y;
     tp.x -= rp.x;
     tp.y -= rp.y;
     // console.log(tp.x, tp.y);
     const proj = mult(dot(tp, this.scalePoint) / (value(tp) ** 2), tp);
-    const res = proj.matrixTransform(this.props.selection.matrix.inverse());
-    const r = this.rootPoint.matrixTransform(this.props.selection.matrix.inverse());
+    const res = proj.matrixTransform(this.props.matrix.inverse());
+    const r = this.rootPoint.matrixTransform(this.props.matrix.inverse());
     res.x = res.x - r.x;
     res.y = res.y - r.y;
     // console.log(res.x - r.x, res.y - r.y);
-    this.context.api.selectedNode.processKnobChange(activeKnob.type, res);
+    this.props.onKnobChange && this.props.onKnobChange(activeKnob.type, res);
     this.lastPoint = e.point;
   };
 
@@ -93,8 +93,7 @@ export default class Selection extends React.Component {
   };
 
   render() {
-    const {selection} = this.props;
-    if (!selection || !selection.show) return null;
+    const selection = this.props;
     return (<g transform={selection.transform}>
       <g style={innerSelectionStyle}>
         <rect

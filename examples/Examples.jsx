@@ -1,40 +1,47 @@
-import React from "react";
-import Slide from "../src/Slide";
-import Milestone from "../src/Milestone";
-import Api from "../src/Api";
+import React from 'react';
+import Canvas from '../src/Canvas';
+import Text from '../src/Text';
+import Milestone from '../src/Milestone';
+import Api from '../src/Api';
 
 const api = Api.create([
-  {
-    factory: Milestone,
-    x: 100,
-    rotate: 0,
-    width: 300,
-    height: 300,
-    labelProps: {
-      text: '#1 Milestone',
-      width: 100,
-      fontSize: 30
-    },
-    milestones: [
-      {
-        text: 'My Milestone'
-      },
-      {
-        text: 'Second Milestone'
-      },
-      {
-        text: 'Third Milestone'
-      }
-    ]
-  }
-]);
+  {factory: Text, fontFamily: 'Verdana', x: 20, y: 20, text: 'Should break between words', width: 70},
+  {factory: Text, fontFamily: 'Verdana', x: 140, y: 20, text: 'Should swallow            spaces at the end', width: 110},
+  {factory: Text, fontFamily: 'Carter One', x: 260, y: 20, text: 'Should\n      break at NL and show spaces', width: 120},
+  {factory: Text, fontFamily: 'Verdana', fontSize: 6, x: 400, y: 20, text: '\n\n     \n     \n empty spaces with auto break', width: 120},
+  {factory: Text, fontFamily: 'Verdana', rotate: 20, x: 520, y: 20, text: 'Should\n\nbe just one empty line', width: 110}
+
+
+  // {
+  //   factory: Milestone,
+  //   x: 100,
+  //   rotate: 0,
+  //   width: 300,
+  //   height: 300,
+  //   labelProps: {
+  //     _id: 'fAsd',
+  //     text: '#1 Milestone',
+  //     width: 100,
+  //     fontSize: 30
+  //   },
+  //   milestones: [
+  //     {
+  //       text: 'Second Milestone'
+  //     },
+  //     {
+  //       text: 'Second Milestone'
+  //     },
+  //     {
+  //       text: 'Second Milestone'
+  //     }
+  //   ]
+  // }
+], []);
 
 export default class Examples extends React.Component {
 
   constructor(props, context) {
     super(props, context);
-
-    api.on('dataChanged', this.handleDataChanged);
 
     api.on('selectionChanged', this.handleSelectionChanged);
   }
@@ -43,13 +50,8 @@ export default class Examples extends React.Component {
     elements: api.elements
   };
 
-
-  handleDataChanged = () => {
-    this.setState({ elements: api.elements });
-  };
-
   handleSelectionChanged = () => {
-    this.setState({ selectedNode: api.selectedNode });
+    this.setState({selections: api.getSelections()});
   };
 
   handleChange = (e) => {
@@ -63,28 +65,21 @@ export default class Examples extends React.Component {
   };
 
   componentWillUnmount() {
-    api.unbind('dataChanged', this.handleDataChanged);
     api.unbind('selectionChanged', this.handleSelectionChanged);
   }
 
   render() {
-    const elements = this.state.elements;
-    const selectedNode = this.state.selectedNode;
-    const form = selectedNode ? selectedNode.getForm() : null;
-    return (<div style={{ padding: 50, position: 'relative'}}>
-      <div style={{height: 544, width: 777}}>
-        <Slide api={api}>
-          {elements.map((el) => {
-            const {_factory, _id, ...other} = el;
-            return React.createElement(_factory, {key: _id, _id: _id, ...other});
-          })}
-        </Slide>
+    const selection = this.state.selections && this.state.selections.length ? this.state.selections[0] : null;
+    const form = selection ? selection.form : null;
+    return (<div style={{position: 'relative'}}>
+      <div style={{minHeight: 400, width: '100%'}}>
+        <Canvas api={api}/>
       </div>
       <div style={{position: 'absolute', right: 0, top: 0}}>
-      {form ? <div>
-        <h3>Form</h3>
-        <div>{form.map(el => <div key={el.key}>{el.key} : <input type={el.type} name={el.key} value={api.getValue(this.state.selectedNode.id, [el.key])} onChange={this.handleChange} /></div>)}</div>
-      </div> : null}
+        {form ? <div>
+          <h3>Form</h3>
+          <div>{form.map(el => <div key={el.key}>{el.key} : <input type={el.type} name={el.key} value={api.getValue(selection.id, [el.key])} onChange={this.handleChange}/></div>)}</div>
+        </div> : null}
       </div>
     </div>);
   }

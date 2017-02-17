@@ -25,15 +25,24 @@ export default class Api extends EventDispatcher {
 
   constructor() {
     super();
-    this.elements = Immutable([]);
-    this.paths = {};
+    this.slide = Immutable({
+      width: 1024,
+      height: 768,
+      elements: Immutable([]),
+      selections: Immutable({})
+    });
+    this.selectedNodes = {};
+    this.paths = {};       
   }
 
-  static create(apiTree) {
+  static create(apiTree, selectedElements) {
     const api = new Api();
     apiTree.forEach((element, i) => {
       const { factory, ...other } = element;
       api.addElement(factory, other, i);
+    });
+    (selectedElements || []).forEach((id) => {
+      api.slide = api.slide.setIn(['selections', id], true);
     });
     window.api = api;
     return api;
@@ -71,7 +80,7 @@ export default class Api extends EventDispatcher {
     });
 
     const targetPath = path.concat(k);
-    this.elements = this.elements.setIn(targetPath, newElement);
+    this.slide = this.slide.setIn(['elements'].concat(targetPath), newElement);
     this.addPath(newElement._id, targetPath);
     elementsToAdd.forEach((el) => {
       this.addElement(el.factory, el.props, el.key, newElement._id);
@@ -89,8 +98,9 @@ export default class Api extends EventDispatcher {
     const k = keyToArray(key);
     const p = this.getDataPath(id).concat(k);
     const deleteKey = p.pop();
+    var newElements;
     if (k.length) {
-      this.elements = Immutable.updateIn(this.elements, k, (val) => {
+      newElements = Immutable.updateIn(this.slide.elements, k, (val) => {
         if (val == null) {
           return val;
         }
@@ -105,22 +115,27 @@ export default class Api extends EventDispatcher {
         }
       });
     } else {
-      this.elements = this.elements.without(deleteKey);
+      newElements = this.slide.elements.without(deleteKey);
     }
+    this.slide = this.slide.set('elements', newElements);
   }
 
   updateElement(id, key, value) {
     const path = this.getDataPath(id);
-    this.elements = this.elements.setIn(path.concat([key]), value);
+    if(path) {
+      this.slide = this.slide.setIn(['elements'].concat(path.concat([key])), value);
+    } else {
+      console.warn(`You tried to update a non existing element width id: ${id}`)
+    }
   }
 
   getValue(id, key) {
     const path = this.getDataPath(id);
-    return getInPath(this.elements, path.concat(keyToArray(key)));
+    return getInPath(this.slide.elements, path.concat(keyToArray(key)));
   }
 
   getElement(id) {
-    return getInPath(this.elements, this.getDataPath(id));
+    return getInPath(this.slide.elements, this.getDataPath(id));
   }
 
   getDataPath(id) {
@@ -128,13 +143,35 @@ export default class Api extends EventDispatcher {
     return this.paths[id];
   }
 
-  selectNode(node) {
-    this.selectedNode = node;
+  selectNode(node, add) {
+    if (!add) {
+      this.slide = this.slide.setIn(['selections'], {});
+    }
+    if (node) {
+      this.slide = this.slide.setIn(['selections', node.id], true);
+      this.selectedNodes[node.id] = node;
+    }
     this.selectionChanged();
   }
 
+  updateSelection(node) {
+    if (this.isNodeSelected(node)) {
+      this.slide = this.slide.setIn(['selections', node.id], true);
+      this.selectedNodes[node.id] = node;
+      this.selectionChanged();
+    }
+  }
+
   isNodeSelected(node) {
-    return this.selectedNode === node;
+    return this.slide.selections[node.id];
+  }
+
+  getSelectedNode(id) {
+    return this.selectedNodes[id];
+  }
+
+  getSelections() {
+    return Object.keys(this.slide.selections).map(id => this.selectedNodes[id].createSelection());
   }
 
   dataChanged() {

@@ -1,7 +1,7 @@
-import React from "react";
-import Element from "./Element";
-import Text from "./Text";
-import Table from "./Table";
+import React from 'react';
+import Element from './Element';
+import Text from './Text';
+import Table from './Table';
 
 export default class MilestoneAsArrow extends Element {
   type = 'milestone';
@@ -45,7 +45,7 @@ export default class MilestoneAsArrow extends Element {
   }
 
   handleClick = () => {
-    this.updateProp('labelProps', Object.assign({}, this.props.labelProps, { text: 'Hello World' }));
+    this.updateProp('labelProps', Object.assign({}, this.props.labelProps, {text: 'Hello World'}));
     this.dataChanged();
   };
 
@@ -58,7 +58,6 @@ export default class MilestoneAsArrow extends Element {
           selectable
           movable={false}
           moveDelegate={this}
-          textAlign="center"
         />
         <Text
           width={this.props.labelProps.width}
@@ -81,10 +80,19 @@ export default class MilestoneAsArrow extends Element {
       </Table>
       <rect></rect>
       <g onClick={this.handleClick}>
-        <circle cx={100} cy={50} r={10} fill="red" />
+        <circle
+          cx={100} cy={50} r={10}
+          fill="red"
+        />
       </g>
       {this.props.milestones.map((m, i) => <g key={m._id} transform={`translate(${colWidth * i}, 0)`}>
-        <Text {...m} selectable scalable={false} movable={false} moveDelegate={this} width={colWidth} y={this.props.height * 0.5} verticalAlign="middle"/>
+        <Text
+          {...m}
+          selectable scalable={false}
+          movable={false} moveDelegate={this}
+          width={colWidth} y={this.props.height * 0.5}
+          verticalAlign="middle"
+        />
       </g>)}
     </g>);
   }

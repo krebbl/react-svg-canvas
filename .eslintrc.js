@@ -10,6 +10,7 @@ module.exports = {
     "react"
   ],
   "rules": {
+    'object-curly-spacing': 0,
     "comma-dangle": ["error", "never"],
     "prefer-arrow-callback": 0,
     "func-names": 0,

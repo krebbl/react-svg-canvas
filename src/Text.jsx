@@ -17,7 +17,7 @@ export default class Text extends Element {
     fontSize: 12,
     fontFamily: 'Verdana',
     verticalAlign: 'top',
-    lineHeight: 1.3,
+    lineHeight: 2,
     textAlign: 'left',
     fill: 'black',
     padding: 2,
@@ -34,7 +34,7 @@ export default class Text extends Element {
   constructor(props, context) {
     super(props, context);
     this.state = {
-      measurement: measureText(Object.assign({}, props, {width: (props.width || 10) - (props.padding * 2)})),
+      measurement: measureText(props),
       editing: false
     };
   }
@@ -58,8 +58,9 @@ export default class Text extends Element {
   }
 
   processChange(key, value, trigger = true) {
+    // TODO: also react on width change!
     if (key === 'text' && !this.props.height) {
-      const height = measureNewHeight(Object.assign({}, this.props, {text: value, width: (this.props.width || 10) - (this.props.padding * 2)}));
+      const height = measureTextHeight(Object.assign({}, this.props, {text: value}));
       const oldHeight = this.state.measurement.height;
       if (height - oldHeight !== 0) {
         const np = this.calcNewPosition(0, 0, 0, height - oldHeight);
@@ -70,12 +71,41 @@ export default class Text extends Element {
     super.processChange(key, value, trigger);
   }
 
+  processKnobChange(knob, dir, diffVector) {
+    if (dir === 'l' || dir === 'r') {
+      var np, newHeight, newWidth;
+      switch (dir) {
+        case 'l':
+          newWidth = this.props.width - diffVector.x;
+          newHeight = measureTextHeight(Object.assign({}, this.props, {width: newWidth})) + 2 * this.props.padding;
+          np = this.calcNewPositionForSize(newWidth, newHeight, 1, -1);
+          this.processChange('x', np.x, false);
+          this.processChange('y', np.y, false);
+          this.processChange('width', newWidth, true);
+          break;
+        case 'r':
+          newWidth = this.props.width + diffVector.x;
+          newHeight = measureTextHeight(Object.assign({}, this.props, {width: newWidth})) + 2 * this.props.padding;
+          np = this.calcNewPositionForSize(newWidth, newHeight, -1, -1);
+          this.processChange('x', np.x, false);
+          this.processChange('y', np.y, false);
+          this.processChange('width', newWidth, true);
+
+          break;
+        default:
+          break;
+      }
+    } else {
+      super.processChange(knob, dir, diffVector);
+    }
+  }
+
   componentWillReceiveProps(nextProps) {
     for (let i = 0; i < wrapProperties.length; i += 1) {
       let key = wrapProperties[i];
       if (nextProps[key] !== this.props[key]) {
         this.setState({
-          measurement: measureText(Object.assign({}, nextProps, {width: (nextProps.width || 10) - (nextProps.padding * 2)}))
+          measurement: measureText(nextProps)
         });
         break;
       }
@@ -152,7 +182,7 @@ export default class Text extends Element {
           currentLine = hardLines[hardLineIndex];
         }
         textNode.setAttributeNS(null, 'x', rect.left);
-        textNode.setAttributeNS(null, 'y', rect.top - (isSafari || isChrome ? lastLineIndex * 0.75 : 0));
+        textNode.setAttributeNS(null, 'y', rect.top - ((isSafari || isChrome) && lastLineIndex ? 0.5 : 0));
         lastTop = rect.top;
       }
     }
@@ -181,7 +211,7 @@ export default class Text extends Element {
         {...props}
         key={this.id}
         ref={this.handeTextEditor}
-        x={this.props.padding} y={this.props.padding - this.state.measurement.firstLineOffset}
+        x={this.props.padding} y={this.props.padding - this.state.measurement.firstLineOffset + 0.5}
         onTextChange={this.handleTextChange}
         onBlur={this.handleTextBlur}
         width={(this.props.width || this.state.width || 0) - (this.props.padding * 2) - 0.01}
@@ -198,13 +228,13 @@ export default class Text extends Element {
       e.stopPropagation();
     }
     if (this.props.editable && this.context.api.isNodeSelected(this)) {
-      this.textDownTime = new Date().getTime();
+      this.textDownTime = e.timeStamp;
     }
   };
 
-  handleTextUp = () => {
-    if (this.props.editable && this.context.api.isNodeSelected(this)) {
-      if (((new Date().getTime()) - this.textDownTime) < 200) {
+  handleTextUp = (e) => {
+    if (!this.state.moving && this.props.editable && this.context.api.isNodeSelected(this)) {
+      if (e.timeStamp - this.textDownTime < 200) {
         this.setState({editing: true});
       }
     }
@@ -212,7 +242,7 @@ export default class Text extends Element {
 
   handleTextWrapperRef = (ref) => {
     this.textWrapperNode = ref;
-  }
+  };
 
   getForm() {
     return [{
@@ -319,7 +349,12 @@ function prepareDivWrapper(options) {
   return divWrapper;
 }
 
-function measureText(options) {
+function preparePropsForMeasurement(props) {
+  return Object.assign({}, props, {width: (props.width || 10) - (props.padding * 2)})
+}
+
+function measureText(props) {
+  const options = preparePropsForMeasurement(props);
   divWrapper = prepareDivWrapper(options);
   const rects = divWrapper.firstChild.getClientRects();
   const topRect = divWrapper.getBoundingClientRect();
@@ -339,7 +374,9 @@ function measureText(options) {
   };
 }
 
-function measureNewHeight(options) {
+function measureTextHeight(props) {
+  const options = preparePropsForMeasurement(props);
+
   divWrapper = prepareDivWrapper(options);
   const firstLineOffset = divWrapper.firstChild.offsetTop;
   return (divWrapper.offsetHeight - (2 * firstLineOffset)) / measureScaleFactor;

@@ -9,8 +9,8 @@ const api = Api.create([
   {factory: Text, fontFamily: 'Verdana', x: 140, y: 20, text: 'Should swallow            spaces at the end', width: 110},
   {factory: Text, fontFamily: 'Carter One', x: 260, y: 20, text: 'Should\n      break at NL and show spaces', width: 120},
   {factory: Text, fontFamily: 'Verdana', fontSize: 6, x: 400, y: 20, text: '\n\n     \n     \n empty spaces with auto break', width: 120},
-  {factory: Text, fontFamily: 'Verdana', rotate: 20, x: 520, y: 20, text: 'Should\n\nbe just one empty line', width: 110}
-
+  {factory: Text, fontFamily: 'Verdana', rotate: 20, x: 520, y: 20, text: 'Should\n\nbe just one empty line', width: 110},
+  {factory: Text, fontFamily: 'Verdana', width: 200, x: 700, y: 20, text: 'asdasdasdasd\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nempty spaces with auto break empty spaces with auto break'}
 
   // {
   //   factory: Milestone,

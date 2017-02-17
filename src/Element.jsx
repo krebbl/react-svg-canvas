@@ -3,6 +3,7 @@ import objectDiff from 'object-diff';
 import shallowequal from 'shallowequal';
 import Api from './Api';
 import Selection from './Selection';
+import ScaleKnob from'./ScaleKnob';
 
 export default class Element extends React.Component {
 
@@ -68,23 +69,35 @@ export default class Element extends React.Component {
     this.context.api.dataChanged();
   }
 
-  getKnobs() {
-    if (!this.props.scalable) {
-      return [];
-    }
+  createKnobs() {
     const knobs = [];
-    if (this.props.width != null) {
-      knobs.push('left', 'right');
+    if (this.props.scalable) {
+      if (this.props.width != null) {
+        knobs.push(<ScaleKnob key="l" dir="l" y={this.actualHeight() * 0.5} onChange={this.handleKnobChange}/>);
+        knobs.push(<ScaleKnob key="r" dir="r" x={this.actualWidth()} y={this.actualHeight() * 0.5} onChange={this.handleKnobChange}/>);
+      }
+      if (this.props.height != null) {
+        knobs.push(<ScaleKnob key="t" dir="t" x={this.actualWidth() * 0.5} onChange={this.handleKnobChange}/>);
+        knobs.push(<ScaleKnob key="b" dir="b" x={this.actualWidth() * 0.5} y={this.actualHeight()} onChange={this.handleKnobChange}/>);
+      }
     }
-    if (this.props.height != null) {
-      knobs.push('top', 'bottom');
-    }
+    // if (this.props.rotatable) {
+    //
+    // }
     return knobs;
   }
 
-  handleKnobChange = (knob, diffVector) => {
-    this.processKnobChange(knob, diffVector);
+  handleKnobChange = (knob, dir, diffVector) => {
+    this.processKnobChange(knob, dir, diffVector);
   };
+
+  actualWidth() {
+    return this.props.width || this.state.width || 0;
+  }
+
+  actualHeight() {
+    return this.props.height || this.state.height || 0;
+  }
 
   createSelection() {
     const selectionContainer = this.context.canvas.selections;
@@ -93,22 +106,23 @@ export default class Element extends React.Component {
     }
     const svgRoot = selectionContainer;
     const node = this.bboxNode;
-    const val = svgRoot.getCTM().inverse().multiply(node.getCTM());
+    const matrix = svgRoot.getCTM().inverse().multiply(node.getCTM());
 
     const props = {
       x: this.state.bboxX,
       y: this.state.bboxY,
-      width: Math.ceil(this.props.width || this.state.width || 0),
-      height: Math.ceil(this.props.height || this.state.height || 0),
-      matrix: val,
-      transform: `matrix(${[val.a, val.b, val.c, val.d, val.e, val.f].join(',')})`,
+      width: Math.ceil(this.actualWidth()),
+      height: Math.ceil(this.actualHeight()),
+      matrix: matrix,
+      transform: `matrix(${[matrix.a, matrix.b, matrix.c, matrix.d, matrix.e, matrix.f].join(',')})`,
       type: this.type,
       editor: this.createEditor(),
       form: this.getForm(),
-      knobs: this.getKnobs(),
       onKnobChange: this.handleKnobChange
     };
-    return <Selection key={this.id} element={this} {...props} />;
+    return <Selection key={this.id} element={this} {...props}>
+      {this.createKnobs(props.width, props.height)}
+    </Selection>;
   }
 
   createEditor() {
@@ -196,54 +210,62 @@ export default class Element extends React.Component {
     return this.node.viewportElement;
   }
 
-  calcNewPosition(x = 0, y = 0, xDiff = 0, yDiff = 0) {
-    const width = this.props.width || this.state.width || 0;
-    const height = this.props.height || this.state.height || 0;
+  calcNewPositionForSize(newWidth, newHeight, anchorX, anchorY) {
+    const width = this.actualWidth();
+    const height = this.actualHeight();
+    const p = {x: this.props.x, y: this.props.y};
+    const c = {x: width * 0.5, y: height * 0.5};
+    const cn = {x: newWidth * 0.5, y: newHeight * 0.5};
+
     const transform = this.svgRoot().createSVGTransform();
     transform.setRotate(this.props.rotate, 0, 0);
-    let point = this.svgRoot().createSVGPoint();
-    point.x = x - ((width + xDiff) * 0.5);
-    point.y = y - ((height + yDiff) * 0.5);
-    point = point.matrixTransform(transform.matrix);
-    let oldPoint = this.svgRoot().createSVGPoint();
-    oldPoint.x = x - (width * 0.5);
-    oldPoint.y = y - (height * 0.5);
-    const fx = oldPoint.x < 0 ? 1 : -1;
-    const fy = oldPoint.y < 0 ? 1 : -1;
-    oldPoint = oldPoint.matrixTransform(transform.matrix);
+
+    let a = this.svgRoot().createSVGPoint();
+    a.x = width * anchorX * 0.5;
+    a.y = height * anchorY * 0.5;
+    a = a.matrixTransform(transform.matrix);
+
+    let an = this.svgRoot().createSVGPoint();
+    an.x = newWidth * anchorX * 0.5;
+    an.y = newHeight * anchorY * 0.5;
+    an = an.matrixTransform(transform.matrix);
 
     return {
-      x: this.props.x + ((fx * (oldPoint.x - point.x)) - (xDiff * 0.5)),
-      y: this.props.y + ((fy * (oldPoint.y - point.y)) - (yDiff * 0.5))
+      x: p.x + (c.x - cn.x) + (a.x - an.x),
+      y: p.y + (c.y - cn.y) + (a.y - an.y)
     };
   }
 
-  processKnobChange(knob, diffVector) {
-    let np;
-    switch (knob) {
-      case 'bottom':
-        np = this.calcNewPosition(0, 0, 0, diffVector.y);
+  processKnobChange(knob, dir, diffVector) {
+    var np, newHeight, newWidth;
+    switch (dir) {
+      case 'b':
+        newHeight = this.props.height + diffVector.y;
+        np = this.calcNewPositionForSize(this.actualWidth(), newHeight, -1, -1);
         this.processChange('x', np.x, false);
         this.processChange('y', np.y, false);
-        this.processChange('height', this.props.height + diffVector.y, true);
+        this.processChange('height', newHeight, true);
         break;
-      case 'top':
-        np = this.calcNewPosition(this.props.width, this.props.height, 0, -diffVector.y);
+      case 't':
+        newHeight = this.props.height - diffVector.y;
+        np = this.calcNewPositionForSize(this.actualWidth(), newHeight, -1, 1);
         this.processChange('x', np.x, false);
         this.processChange('y', np.y, false);
-        this.processChange('height', this.props.height - diffVector.y, true);
+        this.processChange('height', newHeight, true);
         break;
-      case 'left':
-        np = this.calcNewPosition(this.props.width, this.props.height, -diffVector.x, 0);
+      case 'l':
+        newWidth = this.props.width - diffVector.x;
+        np = this.calcNewPositionForSize(newWidth, this.actualHeight(), 1, 1);
         this.processChange('x', np.x, false);
         this.processChange('y', np.y, false);
-        this.processChange('width', this.props.width - diffVector.x, true);
+        this.processChange('width', newWidth, true);
         break;
-      case 'right':
-        np = this.calcNewPosition(0, 0, diffVector.x, 0);
+      case 'r':
+        newWidth = this.props.width + diffVector.x;
+        np = this.calcNewPositionForSize(newWidth, this.actualHeight(), -1, -1);
         this.processChange('x', np.x, false);
         this.processChange('y', np.y, false);
-        this.processChange('width', this.props.width + diffVector.x, true);
+        this.processChange('width', newWidth, true);
 
         break;
       default:
@@ -351,8 +373,8 @@ export default class Element extends React.Component {
   render() {
     const {selectable} = this.props;
     const transform = this.calcTransform(this.props.x, this.props.y,
-      this.props.width || this.state.width,
-      this.props.height || this.state.height,
+      this.actualWidth(),
+      this.actualHeight(),
       this.props.rotate);
 
     return (

@@ -8,7 +8,12 @@ const wrapperStyle = {width: '100%', height: '100%', overflow: 'scroll', positio
 export default class Canvas extends React.Component {
 
   static propTypes = {
-    api: React.PropTypes.instanceOf(Api)
+    api: React.PropTypes.instanceOf(Api),
+    zoom: React.PropTypes.number
+  };
+
+  static defaultProps = {
+    zoom: 1
   };
 
   static childContextTypes = {
@@ -78,11 +83,14 @@ export default class Canvas extends React.Component {
     if (this.svgRoot) {
       const bbox = this.svgRoot.getBoundingClientRect();
       const slide = this.state.slide;
-      let width = bbox.width < slide.width ? slide.width : 0;
-      let height = bbox.height < slide.height ? slide.height : 0;
+      const zoom = this.props.zoom;
+      const slideWidth = slide.width * zoom;
+      const slideHeight = slide.height * zoom;
+      const width = bbox.width < slideWidth ? slideWidth : 0;
+      const height = bbox.height < slideHeight ? slideHeight : 0;
 
-      const slideLeft = ((width || bbox.width) - slide.width) * 0.5;
-      const slideTop = ((height || bbox.height) - slide.height) * 0.5;
+      const slideLeft = ((width || bbox.width) - slideWidth) * 0.5;
+      const slideTop = ((height || bbox.height) - slideHeight) * 0.5;
       if (this.state.width !== width || this.state.height !== height || this.state.slideLeft !== slideLeft || this.state.slideTop !== slideTop) {
         this.setState({
           slideLeft,
@@ -158,8 +166,9 @@ export default class Canvas extends React.Component {
         shapeRendering="geometricPrecision"
         onMouseDown={this.handleMouseDown} onMouseUp={this.handleMouseUp}
       >
+
         <g ref={this.handleRef}>
-          <g ref={this.handleSlideRef} transform={`translate(${this.state.slideLeft}, ${this.state.slideTop})`}>
+          <g ref={this.handleSlideRef} transform={`translate(${this.state.slideLeft}, ${this.state.slideTop}) scale(${this.props.zoom})`}>
             <rect
               width={this.state.slide.width}
               height={this.state.slide.height}

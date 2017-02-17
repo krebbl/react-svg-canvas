@@ -10,17 +10,13 @@ export default class Draggable extends React.Component {
   };
 
   componentDidMount() {
-    let element = this.node;
-    while (element.localName !== 'svg') {
-      element = element.parentNode;
-    }
-    this.svgRoot = element;
+    this.svgRoot = this.node.ownerSVGElement;
   }
 
   onTouchStart = (e) => {
     e.stopPropagation();
     e.preventDefault();
-    
+
     const event = e.nativeEvent;
     const pt = this.svgRoot.createSVGPoint();
     pt.x = event.pageX;

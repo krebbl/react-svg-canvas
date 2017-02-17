@@ -47,16 +47,6 @@ export default class Text extends Element {
     }
   }
 
-  calcBBox() {
-    const bbox = super.calcBBox();
-    return bbox ? Object.assign({}, bbox, {
-      x: bbox.x - this.props.padding,
-      y: bbox.y - this.props.padding,
-      width: bbox.width + (this.props.padding * 2),
-      height: bbox.height + (this.props.padding * 2)
-    }) : null;
-  }
-
   processChange(key, value, trigger = true) {
     if (key === 'text' && !this.props.height) {
       const newHeight = measureTextHeight(Object.assign({}, this.props, {text: value})) + (2 * this.props.padding);
@@ -287,14 +277,13 @@ export default class Text extends Element {
         break;
     }
     return (<g
-      transform={`translate(${this.props.padding}, ${y})`}
       onTouchStart={this.handleTextDown}
       onMouseDown={this.handleTextDown}
       onMouseUp={this.handleTextUp}
       onTouchEnd={this.handleTextUp}
     >
-      <rect width={this.props.width} height={this.state.measurement.height} fill="transparent"/>
-      <g ref={this.handleTextWrapperRef}>
+      <rect width={this.props.width} height={this.state.measurement.height + (2 * this.props.padding)} fill="transparent" />
+      <g transform={`translate(${this.props.padding}, ${y})`} ref={this.handleTextWrapperRef}>
         {rects.map((line, i) => {
           return <text
             key={`${i}'_'${line.left}`} xmlSpace="preserve" dominantBaseline="text-before-edge" className="no-select" style={textStyle} fontFamily={this.props.fontFamily} fontSize={this.props.fontSize}

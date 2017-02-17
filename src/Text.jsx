@@ -293,7 +293,7 @@ export default class Text extends Element {
       <g ref={this.handleTextWrapperRef}>
         {rects.map((line, i) => {
           return <text
-            key={i} xmlSpace="preserve" dominantBaseline="text-before-edge" className="no-select" style={textStyle} fontFamily={this.props.fontFamily} fontSize={this.props.fontSize}
+            key={`${i}'_'${line.left}`} xmlSpace="preserve" dominantBaseline="text-before-edge" className="no-select" style={textStyle} fontFamily={this.props.fontFamily} fontSize={this.props.fontSize}
             dy={dy} y={line.top - this.state.measurement.firstLineOffset} fill={this.state.editing ? 'transparent' : this.props.fill}
           />;
         })}

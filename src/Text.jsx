@@ -58,15 +58,11 @@ export default class Text extends Element {
   }
 
   processChange(key, value, trigger = true) {
-    // TODO: also react on width change!
     if (key === 'text' && !this.props.height) {
-      const height = measureTextHeight(Object.assign({}, this.props, {text: value}));
-      const oldHeight = this.state.measurement.height;
-      if (height - oldHeight !== 0) {
-        const np = this.calcNewPosition(0, 0, 0, height - oldHeight);
-        this.processChange('x', np.x, false);
-        this.processChange('y', np.y, false);
-      }
+      const newHeight = measureTextHeight(Object.assign({}, this.props, {text: value})) + (2 * this.props.padding);
+      const np = this.calcNewPositionForSize(this.props.width, newHeight, 1, -1);
+      this.processChange('x', np.x, false);
+      this.processChange('y', np.y, false);
     }
     super.processChange(key, value, trigger);
   }
@@ -77,7 +73,7 @@ export default class Text extends Element {
       switch (dir) {
         case 'l':
           newWidth = this.props.width - diffVector.x;
-          newHeight = measureTextHeight(Object.assign({}, this.props, {width: newWidth})) + 2 * this.props.padding;
+          newHeight = measureTextHeight(Object.assign({}, this.props, {width: newWidth})) + (2 * this.props.padding);
           np = this.calcNewPositionForSize(newWidth, newHeight, 1, -1);
           this.processChange('x', np.x, false);
           this.processChange('y', np.y, false);
@@ -85,7 +81,7 @@ export default class Text extends Element {
           break;
         case 'r':
           newWidth = this.props.width + diffVector.x;
-          newHeight = measureTextHeight(Object.assign({}, this.props, {width: newWidth})) + 2 * this.props.padding;
+          newHeight = measureTextHeight(Object.assign({}, this.props, {width: newWidth})) + (2 * this.props.padding);
           np = this.calcNewPositionForSize(newWidth, newHeight, -1, -1);
           this.processChange('x', np.x, false);
           this.processChange('y', np.y, false);

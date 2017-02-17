@@ -7,6 +7,7 @@ import Api from '../src/Api';
 const api = Api.create([
   {factory: Text, fontFamily: 'Verdana', x: 20, y: 20, text: 'Should break between words', width: 70},
   {factory: Text, fontFamily: 'Verdana', x: 140, y: 20, text: 'Should swallow            spaces at the end', width: 110},
+  {factory: Text, fontFamily: 'Verdana', x: 140, y: 100, text: 'Should use_the            spaces as empty line', width: 53},
   {factory: Text, fontFamily: 'Arial', x: 260, y: 20, text: 'Should\n      break at NL and show spaces', width: 120},
   {factory: Text, fontFamily: 'Verdana', fontSize: 6, x: 400, y: 20, text: '\n\n     \n     \n empty spaces with auto break', width: 120},
   {factory: Text, fontFamily: 'Verdana', rotate: 20, x: 520, y: 20, text: 'Should\n\nbe just one empty line', width: 110},

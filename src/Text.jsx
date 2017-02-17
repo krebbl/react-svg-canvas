@@ -39,11 +39,11 @@ export default class Text extends Element {
     };
   }
 
-  getKnobs() {
+  createKnobs() {
     if (this.state.editing) {
       return [];
     } else {
-      return super.getKnobs();
+      return super.createKnobs();
     }
   }
 
@@ -152,6 +152,7 @@ export default class Text extends Element {
       let hardLineIndex = 0;
       let lastLineIndex = hardLineIndex;
       let currentLine = hardLines[hardLineIndex];
+      let lastTextContent = '';
       for (let i = 0; i < rects.length; i++) {
         rect = rects[i];
         textNode = this.textWrapperNode.childNodes[i];
@@ -159,7 +160,9 @@ export default class Text extends Element {
         textNode.removeAttributeNS(null, 'y');
         // if we have a softbreak delete all leading spaces
         if (lastLineIndex === hardLineIndex && lastTop !== rect.top) {
-          currentLine = currentLine.replace(/^\s+/, '');
+          if (/\s/.test(lastTextContent.substr(-1)) || isFirefox) {
+            currentLine = currentLine.replace(/^\s+/, '');
+          }
         }
         textNode.textContent = currentLine;
 
@@ -180,6 +183,7 @@ export default class Text extends Element {
         textNode.setAttributeNS(null, 'x', rect.left);
         textNode.setAttributeNS(null, 'y', rect.top - ((isSafari || isChrome) && lastLineIndex ? 0.5 : 0));
         lastTop = rect.top;
+        lastTextContent = textNode.textContent;
       }
     }
   }
@@ -306,7 +310,7 @@ export default class Text extends Element {
 
 var divWrapper;
 function createDivWrapper() {
-  const outsideWrapper = document.createElement("div");
+  const outsideWrapper = document.createElement('div');
   outsideWrapper.style.position = 'absolute';
   outsideWrapper.style.width = '100px';
   outsideWrapper.style.height = '100px';

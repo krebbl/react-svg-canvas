@@ -29,6 +29,15 @@ The boilerplate includes a [GitHub Pages](https://pages.github.com/) specific po
 * Deploying - **npm run deploy-gh-pages** - Deploys the contents of `./gh-pages` to the `gh-pages` branch. GitHub will pick this up automatically. Your site will be available through *<user name>.github.io/<project name>`.
 * Generating stats - **npm run stats** - Generates stats that can be passed to [webpack analyse tool](https://webpack.github.io/analyse/). This is useful for investigating what the build consists of.
 
+### Roadmap
+
+Main goal: Simplify the process of visualizing ideas, plans and information
+
+* Implement basic elements with tests
+* Implement demo editor
+* TODO: ...
+* Build extendable editor like Atom which allows developers to create their own plugins
+
 ## Highlighting Demo for the Site
 
 ```js

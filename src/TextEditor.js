@@ -87,7 +87,7 @@ export default class TextEditor extends React.Component {
       };
 
       this._target.onblur = () => {
-        // this.props.onBlur && this.props.onBlur();
+        this.props.onBlur && this.props.onBlur();
       };
 
       this.context.canvas.wrapperNode.appendChild(this._target);

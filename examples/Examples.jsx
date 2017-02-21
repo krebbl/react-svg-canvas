@@ -5,13 +5,14 @@ import Milestone from '../src/Milestone';
 import Api from '../src/Api';
 
 const api = Api.create([
-  {factory: Text, fontFamily: 'Verdana', x: 20, y: 20, text: 'Should break between words', width: 70},
-  {factory: Text, fontFamily: 'Verdana', x: 140, y: 20, text: 'Should swallow            spaces at the end', width: 110},
-  {factory: Text, fontFamily: 'Verdana', x: 140, y: 100, text: 'Should use_the            spaces as empty line', width: 53},
-  {factory: Text, fontFamily: 'Arial', x: 260, y: 20, text: 'Should\n      break at NL and show spaces', width: 120},
-  {factory: Text, fontFamily: 'Verdana', fontSize: 6, x: 400, y: 20, text: '\n\n     \n     \n empty spaces with auto break', width: 120},
-  {factory: Text, fontFamily: 'Verdana', rotate: 20, x: 520, y: 20, text: 'Should\n\nbe just one empty line', width: 110},
-  {factory: Text, fontFamily: 'Verdana', width: 200, x: 700, y: 20, text: 'asdasdasdasd\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nempty spaces with auto break empty spaces with auto break'}
+  {factory: Text, fontFamily: 'Arial', fontSize: 16, x: 20, y: 30, text: 'Should break between words', width: 70},
+  {factory: Text, fontFamily: 'Verdana', fontSize: 6, x: 20, y: 10, text: 'Should break', width: 30},
+  {factory: Text, fontFamily: 'Arial', lineHeight: 3, x: 140, y: 20, text: 'Should swallow            spaces at the end', width: 110},
+  {factory: Text, fontFamily: 'Times', rotate: 30, x: 140, fontSize: 17, y: 0, lineHeight: 2.0, text: 'Should use_the            spaces as empty line', width: 53},
+  {factory: Text, fontFamily: 'Arial', fontSize: 17, x: 260, y: 20, text: 'Should\n      break at NL and show spaces', width: 120},
+  // {factory: Text, fontFamily: 'Verdana', fontSize: 6, x: 400, y: 20, text: '\n\n     \n     \n empty spaces with auto break', width: 120},
+  // {factory: Text, fontFamily: 'Times New Roman', rotate: 20, x: 520, y: 20, text: 'Should\n\nbe just one empty line', width: 110},
+  // {factory: Text, fontFamily: 'Verdana', width: 200, x: 700, y: 20, text: 'asdasdasdasd\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nempty spaces with auto break empty spaces with auto break'}
 
   // {
   //   factory: Milestone,
@@ -48,11 +49,12 @@ export default class Examples extends React.Component {
   }
 
   state = {
-    elements: api.elements
+    elements: api.elements,
+    zoom: 0.7
   };
 
   handleSelectionChanged = () => {
-    this.setState({selections: api.getSelections()});
+    this.setState({selectedNodes: api.getSelectedNodes()});
   };
 
   handleChange = (e) => {
@@ -62,26 +64,48 @@ export default class Examples extends React.Component {
     if (e.target.type === 'number') {
       val = Number(val);
     }
-    this.state.selectedNode.processChange(e.target.name, val);
+    this.state.selectedNodes[0].processChange(e.target.name, val);
   };
 
   componentWillUnmount() {
     api.unbind('selectionChanged', this.handleSelectionChanged);
   }
 
+  decreaseZoom = () => {
+    this.setState({zoom: this.state.zoom - 0.10});
+  }
+
+  increaseZoom = () => {
+    this.setState({zoom: this.state.zoom + 0.10});
+  }
+
   render() {
-    const selection = this.state.selections && this.state.selections.length ? this.state.selections[0] : null;
-    const form = selection ? selection.form : null;
+    const selection = this.state.selectedNodes && this.state.selectedNodes.length ? this.state.selectedNodes[0] : null;
+    const form = selection ? selection.getForm() : null;
     return (<div style={{position: 'relative'}}>
-      <div style={{minHeight: 400, width: '100%'}}>
-        <Canvas api={api}/>
+      <div>
+        <div>
+          <button onClick={this.decreaseZoom}>-</button>
+          Zoom ({(this.state.zoom).toFixed(2)})
+          <button onClick={this.increaseZoom}>+</button>
+        </div>
       </div>
-      <div style={{position: 'absolute', right: 0, top: 0}}>
+      <div style={{minHeight: 600, maxHeight: 700, marginRight: 200, position: 'relative'}}>
+        <Canvas zoom={this.state.zoom} api={api} />
+      </div>
+      <div style={{position: 'absolute', right: 0, top: 0, width: 200}}>
         {form ? <div>
           <h3>Form</h3>
-          <div>{form.map(el => <div key={el.key}>{el.key} : <input type={el.type} name={el.key} value={api.getValue(selection.id, [el.key])} onChange={this.handleChange}/></div>)}</div>
+          <div>{form.map(el => <div key={el.key}>{el.key} : <Input type={el.type} name={el.key} value={api.getValue(selection.id, [el.key])} onChange={this.handleChange} /></div>)}</div>
         </div> : null}
       </div>
     </div>);
   }
+}
+
+const Input = (props) => {
+  if (props.type === 'text') {
+    return <textarea name={props.name} value={props.value} onChange={props.onChange} />;
+  }
+  return <input {...props} />;
 }

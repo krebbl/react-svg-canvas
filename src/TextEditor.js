@@ -1,7 +1,7 @@
 import React, {PropTypes} from 'react';
+import bowser from 'bowser';
 
 const wrapProperties = ['text', 'fontSize', 'fontFamily', 'verticalAlign', 'lineHeight', 'textAlign', 'width'];
-const isFirefox = navigator.userAgent.toLowerCase().indexOf('firefox') > -1;
 
 export default class TextEditor extends React.Component {
 
@@ -55,8 +55,6 @@ export default class TextEditor extends React.Component {
 
     if (!this._target) {
       this._target = document.createElement('div');
-      this.context.canvas.wrapperNode.appendChild(this._target);
-
       const style = this._target.style;
       style.position = 'absolute';
       style.top = '0';
@@ -68,10 +66,19 @@ export default class TextEditor extends React.Component {
       style.border = 'none';
       style.wordBreak = 'break-word';
       style.wordWrap = 'break-word'; // for FF
-      style.padding = 'none';
+      style.padding = '0';
       style.transformOrigin = '0 0';
+      style.textRendering = 'geometricPrecision';
 
       this._target.setAttribute('contenteditable', 'true');
+
+
+      this._target.onkeydown = (e) => {
+        if (bowser.msie && e.which === 13) {
+          e.preventDefault();
+          // TODO: insert line break instead of paragraph
+        }
+      };
       this._target.onkeyup = (e) => {
         this.props.onTextChange && this.props.onTextChange(e);
       };
@@ -80,8 +87,10 @@ export default class TextEditor extends React.Component {
       };
 
       this._target.onblur = () => {
-        this.props.onBlur && this.props.onBlur();
+        // this.props.onBlur && this.props.onBlur();
       };
+
+      this.context.canvas.wrapperNode.appendChild(this._target);
     }
 
     const target = this._target;
@@ -96,7 +105,7 @@ export default class TextEditor extends React.Component {
     });
 
     if (this.props.text !== target.textContent) {
-      target.textContent = this.props.text;
+      target.innerHTML = `<span>${this.props.text.replace(/\r?\n/gi, '<br/>')}</span>`;
     }
     this.positionEditable(target);
     target.focus();

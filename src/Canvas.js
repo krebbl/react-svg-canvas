@@ -3,13 +3,14 @@ import Api from './Api';
 import Selection from './Selection';
 import './css/common.css';
 
-const wrapperStyle = {width: '100%', height: '100%', overflow: 'scroll', position: 'relative'};
+const wrapperStyle = {width: '100%', height: '100%', overflow: 'auto', position: 'absolute'};
 
 export default class Canvas extends React.Component {
 
   static propTypes = {
-    api: React.PropTypes.instanceOf(Api),
-    zoom: React.PropTypes.number
+    api: PropTypes.instanceOf(Api),
+    zoom: PropTypes.number,
+    onFirstRender: PropTypes.func
   };
 
   static defaultProps = {
@@ -76,18 +77,28 @@ export default class Canvas extends React.Component {
   componentDidUpdate(prevProps, prevState) {
     if (!prevState.readyForRender && this.state.readyForRender) {
       this.positionSlide();
+      this.props.onFirstRender && this.props.onFirstRender(this);
+    } else if (this.state.readyForRender && prevProps.zoom !== this.props.zoom) {
+      this.positionSlide();
+    }
+
+    if (prevState.slideLeft !== this.state.slideLeft
+      || prevState.slideTop !== this.state.slideTop
+      || prevState.width !== this.state.width
+      || prevState.height !== this.state.height) {
+      this.props.api.selectionChanged();
     }
   }
 
   positionSlide() {
     if (this.svgRoot) {
-      const bbox = this.svgRoot.getBoundingClientRect();
+      const bbox = this.svgRoot.parentNode.getBoundingClientRect();
       const slide = this.state.slide;
       const zoom = this.props.zoom;
       const slideWidth = slide.width * zoom;
       const slideHeight = slide.height * zoom;
-      const width = bbox.width < slideWidth ? slideWidth : 0;
-      const height = bbox.height < slideHeight ? slideHeight : 0;
+      const width = Math.max(slideWidth, bbox.width - 20);
+      const height = Math.max(slideHeight, bbox.height - 20);
 
       const slideLeft = ((width || bbox.width) - slideWidth) * 0.5;
       const slideTop = ((height || bbox.height) - slideHeight) * 0.5;

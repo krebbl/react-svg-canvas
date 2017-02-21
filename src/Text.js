@@ -1,12 +1,15 @@
 import React, {PropTypes} from 'react';
+import bowser from 'bowser';
 import Element from './Element';
 import TextEditor from './TextEditor';
-// whiteSpace: 'pre', textRendering: 'geometricPrecision'
-const textStyle = {};
+// whiteSpace: 'pre',
 const wrapProperties = ['text', 'fontSize', 'fontFamily', 'verticalAlign', 'lineHeight', 'textAlign', 'width', 'padding'];
-const isFirefox = navigator.userAgent.toLowerCase().indexOf('firefox') > -1;
-const isChrome = /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor);
-const isSafari = /Safari/.test(navigator.userAgent) && /Apple Computer/.test(navigator.vendor);
+const isFirefox = bowser.firefox;
+const isChrome = bowser.chrome;
+const isSafari = bowser.safari || (bowser.ios && bowser.safari);
+const isMSIEdge = bowser.msie || bowser.msedge;
+const textStyle = { whiteSpace: isMSIEdge ? 'pre-wrap' : '', textRendering: 'geometricPrecision'};
+const isDebug = process.env.NODE_ENV !== 'production' && process.env.DEBUG;
 
 export default class Text extends Element {
 
@@ -17,7 +20,7 @@ export default class Text extends Element {
     fontSize: 12,
     fontFamily: 'Verdana',
     verticalAlign: 'top',
-    lineHeight: 2,
+    lineHeight: 1.5,
     textAlign: 'left',
     fill: 'black',
     padding: 2,
@@ -48,13 +51,21 @@ export default class Text extends Element {
   }
 
   processChange(key, value, trigger = true) {
-    if (key === 'text' && !this.props.height) {
-      const newHeight = measureTextHeight(Object.assign({}, this.props, {text: value})) + (2 * this.props.padding);
+    if (key !== 'width' && wrapProperties.indexOf(key) > -1 && !this.props.height) {
+      var change = {};
+      change[key] = value;
+      const newHeight = measureTextHeight(Object.assign({}, this.props, change)) + (2 * this.props.padding);
       const np = this.calcNewPositionForSize(this.props.width, newHeight, 1, -1);
       this.processChange('x', np.x, false);
       this.processChange('y', np.y, false);
     }
     super.processChange(key, value, trigger);
+  }
+
+  calcBBox() {
+    const node = this.textRectNode;
+    if (!node) return null;
+    return node.getBBox();
   }
 
   processKnobChange(knob, dir, diffVector) {
@@ -128,6 +139,7 @@ export default class Text extends Element {
 
   wrapText() {
     const rects = this.state.measurement.rects;
+    const baseline = this.state.measurement.baseline;
     let textContent = this.props.text;
     const svgRoot = this.svgRoot();
     const p = svgRoot.createSVGPoint();
@@ -142,14 +154,18 @@ export default class Text extends Element {
       let hardLineIndex = 0;
       let lastLineIndex = hardLineIndex;
       let currentLine = hardLines[hardLineIndex];
+      let currentLineIndex = hardLineIndex;
       let lastTextContent = '';
       for (let i = 0; i < rects.length; i++) {
         rect = rects[i];
         textNode = this.textWrapperNode.childNodes[i];
         textNode.removeAttributeNS(null, 'x');
         textNode.removeAttributeNS(null, 'y');
+        if(lastTop !== rect.top) {
+          currentLineIndex++;
+        }
         // if we have a softbreak delete all leading spaces
-        if (lastLineIndex === hardLineIndex && lastTop !== rect.top) {
+        if (lastLineIndex === hardLineIndex && lastTop !== rect.top && !isMSIEdge) {
           if (/\s/.test(lastTextContent.substr(-1)) || isFirefox) {
             currentLine = currentLine.replace(/^\s+/, '');
           }
@@ -163,15 +179,18 @@ export default class Text extends Element {
         num = textNode.getCharNumAtPosition(p);
         if (num > -1) {
           textNode.textContent = currentLine.substr(0, num + 1);
-          currentLine = currentLine.substr(num + 1);
+          currentLine = currentLine.substr(num + 1).replace(/\r$/,'');
         }
 
-        if (num < 0 || (isFirefox && !currentLine)) {
+        textNode.setAttributeNS(null, 'x', rect.left);
+        textNode.setAttributeNS(null, 'y', rect.top - Math.round(Math.min(0, textNode.getBBox().y)));
+
+        if (num < 0 || ((isFirefox || isMSIEdge) && !currentLine)) {
           hardLineIndex += 1;
           currentLine = hardLines[hardLineIndex];
         }
-        textNode.setAttributeNS(null, 'x', rect.left);
-        textNode.setAttributeNS(null, 'y', rect.top - ((isSafari || isChrome) && lastLineIndex ? 0.5 : 0));
+
+
         lastTop = rect.top;
         lastTextContent = textNode.textContent;
       }
@@ -197,11 +216,16 @@ export default class Text extends Element {
         props[key] = this.props[key];
       });
 
+      const bbox = this.textWrapperNode.firstChild.getBBox();
+      const textBaseline = isFirefox ? bbox.y + bbox.height : Math.round(bbox.y + bbox.height);
+      // console.log(bbox.y, bbox.height, textBaseline, this.state.measurement.baseline);
+      const dy = Math.round(textBaseline - this.state.measurement.baseline);
+
       return <TextEditor
         {...props}
         key={this.id}
         ref={this.handeTextEditor}
-        x={this.props.padding} y={this.props.padding - this.state.measurement.firstLineOffset + 0.5}
+        x={this.props.padding} y={this.props.padding + dy}
         onTextChange={this.handleTextChange}
         onBlur={this.handleTextBlur}
         width={(this.props.width || this.state.width || 0) - (this.props.padding * 2) - 0.01}
@@ -232,6 +256,10 @@ export default class Text extends Element {
 
   handleTextWrapperRef = (ref) => {
     this.textWrapperNode = ref;
+  };
+
+  handleTextRect = (ref) => {
+    this.textRectNode = ref;
   };
 
   getForm() {
@@ -282,14 +310,27 @@ export default class Text extends Element {
       onMouseUp={this.handleTextUp}
       onTouchEnd={this.handleTextUp}
     >
-      <rect width={this.props.width} height={this.state.measurement.height + (2 * this.props.padding)} fill="transparent" />
-      <g transform={`translate(${this.props.padding}, ${y})`} ref={this.handleTextWrapperRef}>
-        {rects.map((line, i) => {
-          return <text
-            key={`${i}'_'${line.left}`} xmlSpace="preserve" dominantBaseline="text-before-edge" className="no-select" style={textStyle} fontFamily={this.props.fontFamily} fontSize={this.props.fontSize}
-            dy={dy} y={line.top - this.state.measurement.firstLineOffset} fill={this.state.editing ? 'transparent' : this.props.fill}
+      <rect ref={this.handleTextRect} width={this.props.width} height={this.state.measurement.height + (2 * this.props.padding)} fill="transparent"/>
+      <g>
+        {isDebug ? rects.map((line, i) => {
+          return <rect
+            key={`${i}'_'${line.left}`}
+            width={line.width} height={line.height}
+            x={line.left}
+            y={line.top}
+            fill="green"
           />;
-        })}
+        }) : null}
+      </g>
+      <g transform={`translate(${this.props.padding}, ${y})`}>
+        <g ref={this.handleTextWrapperRef}>
+          {rects.map((line, i) => {
+            return <text
+              key={`${i}'_'${line.left}`} xmlSpace="preserve" className="no-select" style={textStyle} fontFamily={this.props.fontFamily} fontSize={this.props.fontSize}
+              dy="1em" y={line.top} fill={this.state.editing ? 'transparent' : this.props.fill}
+            />;
+          })}
+        </g>
       </g>
     </g>);
   }
@@ -313,6 +354,9 @@ function createDivWrapper() {
   ret.style.whiteSpace = 'pre-wrap';
   ret.style.wordWrap = 'break-word';
   ret.style.wordBreak = 'break-word'; // for FF
+  ret.style.color = 'transparent';
+  ret.style.textRendering = 'geometricPrecision';
+  ret.style.padding = '0';
 
   outsideWrapper.appendChild(ret);
   document.body.appendChild(outsideWrapper);
@@ -320,7 +364,7 @@ function createDivWrapper() {
   return ret;
 }
 
-const measureScaleFactor = 4;
+const measureScaleFactor = 1;
 
 function prepareDivWrapper(options) {
   const {text, fontSize, fontFamily, width, textAlign, lineHeight} = options;
@@ -331,42 +375,41 @@ function prepareDivWrapper(options) {
   divWrapper.style.lineHeight = lineHeight;
   divWrapper.style.fontSize = `${fontSize * measureScaleFactor}px`;
   divWrapper.style.width = `${width * measureScaleFactor}px`;
-  divWrapper.style.color = 'transparent';
   divWrapper.style.textAlign = textAlign;
-  divWrapper.innerHTML = `<span>${text.replace(/\n/gi, '<br/>')}</span>`;
+  divWrapper.innerHTML = `<span>${text.replace(/\r?\n/gi, '<br/>')}</span>`;
 
   return divWrapper;
 }
 
 function preparePropsForMeasurement(props) {
-  return Object.assign({}, props, {width: (props.width || 10) - (props.padding * 2)})
+  return Object.assign({}, props, {width: (props.width || 10) - (props.padding * 2)});
 }
 
-function measureText(props) {
+function measureText(props, withoutRects) {
   const options = preparePropsForMeasurement(props);
   divWrapper = prepareDivWrapper(options);
   const rects = divWrapper.firstChild.getClientRects();
   const topRect = divWrapper.getBoundingClientRect();
-  const firstLineOffset = divWrapper.firstChild.offsetTop;
-
+  const firstLineOffset = (rects.length ? rects[0].top - topRect.top : 0);
+  const baseline = (rects.length ? rects[0].bottom - topRect.top : 0);
+  // console.log(baseline / measureScaleFactor);
   return {
     height: (divWrapper.offsetHeight - (2 * firstLineOffset)) / measureScaleFactor,
     firstLineOffset: firstLineOffset / measureScaleFactor,
-    rects: [].map.call(rects, (rect) => {
+    baseline: baseline / measureScaleFactor,
+    rects: !withoutRects ? [].map.call(rects, (rect) => {
       return {
         left: (rect.left - topRect.left) / measureScaleFactor,
         top: (rect.top - topRect.top - firstLineOffset) / measureScaleFactor,
+        bottom: (rect.bottom - topRect.top) / measureScaleFactor,
+        absoluteBottom: topRect.bottom / measureScaleFactor,
         width: rect.width / measureScaleFactor,
         height: rect.height / measureScaleFactor
       };
-    })
+    }) : []
   };
-}
+};
 
 function measureTextHeight(props) {
-  const options = preparePropsForMeasurement(props);
-
-  divWrapper = prepareDivWrapper(options);
-  const firstLineOffset = divWrapper.firstChild.offsetTop;
-  return (divWrapper.offsetHeight - (2 * firstLineOffset)) / measureScaleFactor;
+  return measureText(props, true).height;
 }

@@ -282,6 +282,9 @@ export default class Element extends React.Component {
       }
       if (trigger) {
         this.context.api.dataChanged();
+        if(this.context.api.isNodeSelected(this)) {
+          this.context.api.selectionChanged();
+        }
       }
     }
   }

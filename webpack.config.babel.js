@@ -87,11 +87,15 @@ if (TARGET === 'start') {
   module.exports = merge(common, siteCommon, {
     devtool: 'eval',
     entry: {
-      docs: [config.paths.docs]
+      docs: [
+        require.resolve('babel-polyfill'),
+        config.paths.docs
+      ]
     },
     plugins: [
       new webpack.DefinePlugin({
-        'process.env.NODE_ENV': '"development"'
+        'process.env.NODE_ENV': '"development"',
+        'process.env.DEBUG': '0'
       }),
       new webpack.HotModuleReplacementPlugin()
     ],
@@ -130,7 +134,8 @@ if (TARGET === 'gh-pages' || TARGET === 'gh-pages:stats') {
       app: config.paths.docs,
       vendors: [
         'react',
-        'react-dom'
+        'react-dom',
+        'babel-polyfill'
       ]
     },
     output: {
@@ -145,7 +150,8 @@ if (TARGET === 'gh-pages' || TARGET === 'gh-pages:stats') {
       new ExtractTextPlugin('[name].[chunkhash].css'),
       new webpack.DefinePlugin({
           // This affects the react lib size
-        'process.env.NODE_ENV': '"production"'
+        'process.env.NODE_ENV': '"production"',
+        'process.env.DEBUG': '0'
       }),
       new webpack.optimize.DedupePlugin(),
       new webpack.optimize.UglifyJsPlugin({

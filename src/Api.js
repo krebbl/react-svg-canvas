@@ -170,6 +170,10 @@ export default class Api extends EventDispatcher {
     return this.selectedNodes[id];
   }
 
+  getSelectedNodes() {
+    return Object.keys(this.slide.selections).map(id => this.selectedNodes[id]);
+  }
+
   getSelections() {
     return Object.keys(this.slide.selections).map(id => this.selectedNodes[id].createSelection());
   }

@@ -275,6 +275,10 @@ export default class Text extends Element {
       type: 'number',
       key: 'lineHeight',
       title: 'Line Height'
+    }, {
+      type: 'number',
+      key: 'rotate',
+      title: 'Rotation'
     }];
   }
 

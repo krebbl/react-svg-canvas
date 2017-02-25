@@ -3,7 +3,7 @@ import bowser from 'bowser';
 import Element from './Element';
 import TextEditor from './TextEditor';
 // whiteSpace: 'pre',
-const wrapProperties = ['text', 'fontSize', 'fontFamily', 'verticalAlign', 'lineHeight', 'textAlign', 'width', 'padding'];
+const wrapProperties = ['text', 'fontSize', 'fontFamily', 'verticalAlign', 'lineHeight', 'textAlign', 'width', 'padding', 'maxWidth'];
 const isFirefox = bowser.firefox;
 const isChrome = bowser.chrome;
 const isSafari = bowser.safari || (bowser.ios && bowser.safari);
@@ -24,14 +24,17 @@ export default class Text extends Element {
     textAlign: 'left',
     fill: 'black',
     padding: 2,
-    editable: true
+    editable: true,
+    background: 'transparent',
+    maxWidth: null
   });
 
   static propTypes = {
     text: PropTypes.string,
     verticalAlign: PropTypes.oneOf(['top', 'middle', 'bottom']),
     textAlign: PropTypes.oneOf(['left', 'center', 'right']),
-    lineHeight: PropTypes.number
+    lineHeight: PropTypes.number,
+    maxWidth: PropTypes.number
   };
 
   constructor(props, context) {
@@ -55,18 +58,18 @@ export default class Text extends Element {
       var change = {};
       change[key] = value;
       const newHeight = measureTextHeight(Object.assign({}, this.props, change)) + (2 * this.props.padding);
-      const np = this.calcNewPositionForSize(this.props.width, newHeight, 1, -1);
+      const np = this.calcNewPositionForSize(this.props.width || this.state.width, newHeight, 1, -1);
       this.processChange('x', np.x, false);
       this.processChange('y', np.y, false);
     }
     super.processChange(key, value, trigger);
   }
 
-  calcBBox() {
-    const node = this.textRectNode;
-    if (!node) return null;
-    return node.getBBox();
-  }
+  // calcBBox() {
+  //   const node = this.textRectNode;
+  //   if (!node) return null;
+  //   return node.getBBox();
+  // }
 
   processKnobChange(knob, dir, diffVector) {
     if (dir === 'l' || dir === 'r') {
@@ -215,6 +218,7 @@ export default class Text extends Element {
       wrapProperties.forEach((key) => {
         props[key] = this.props[key];
       });
+      props.fill = this.props.fill;
 
       const bbox = this.textWrapperNode.firstChild.getBBox();
       const textBaseline = isFirefox ? bbox.y + bbox.height : Math.round(bbox.y + bbox.height);
@@ -228,9 +232,9 @@ export default class Text extends Element {
         x={this.props.padding} y={this.props.padding + dy}
         onTextChange={this.handleTextChange}
         onBlur={this.handleTextBlur}
-        width={(this.props.width || this.state.width || 0) - (this.props.padding * 2) - 0.01}
+        width={(this.props.maxWidth || this.props.width || this.state.width || 0) - (this.props.padding * 2) - 0.01}
         height={(this.state.height || 0) - (this.props.padding * 2)}
-        text={this.props.text} fill="blue"
+        text={this.props.text}
       />;
     } else {
       return null;
@@ -314,7 +318,7 @@ export default class Text extends Element {
       onMouseUp={this.handleTextUp}
       onTouchEnd={this.handleTextUp}
     >
-      <rect ref={this.handleTextRect} width={this.props.width} height={this.state.measurement.height + (2 * this.props.padding)} fill="transparent"/>
+      <rect ref={this.handleBBoxRef} width={this.props.width || (this.state.measurement.width + (2 * this.props.padding))} height={this.state.measurement.height + (2 * this.props.padding)} fill={this.props.background}/>
       <g>
         {isDebug ? rects.map((line, i) => {
           return <rect
@@ -371,14 +375,15 @@ function createDivWrapper() {
 const measureScaleFactor = 1;
 
 function prepareDivWrapper(options) {
-  const {text, fontSize, fontFamily, width, textAlign, lineHeight} = options;
-
+  const {text, fontSize, fontFamily, maxWidth, width, textAlign, lineHeight} = options;
+  const actualWidth = maxWidth || width;
   divWrapper = divWrapper || createDivWrapper();
   divWrapper.innerHTML = '';
   divWrapper.style.fontFamily = fontFamily;
   divWrapper.style.lineHeight = lineHeight;
   divWrapper.style.fontSize = `${fontSize * measureScaleFactor}px`;
-  divWrapper.style.width = `${width * measureScaleFactor}px`;
+  divWrapper.style.width = actualWidth ? `${actualWidth * measureScaleFactor}px` : 'auto';
+  // divWrapper.style.maxWidth = maxWidth ? `${maxWidth * measureScaleFactor}px` : 'none';
   divWrapper.style.textAlign = textAlign;
   divWrapper.innerHTML = `<span>${text.replace(/\r?\n/gi, '<br/>')}</span>`;
 
@@ -386,7 +391,7 @@ function prepareDivWrapper(options) {
 }
 
 function preparePropsForMeasurement(props) {
-  return Object.assign({}, props, {width: (props.width || 10) - (props.padding * 2)});
+  return Object.assign({}, props, {width: props.width ? props.width - (props.padding * 2) : 0, maxWidth: props.maxWidth ? props.maxWidth - (props.padding * 2) : 0});
 }
 
 function measureText(props, withoutRects) {
@@ -397,7 +402,13 @@ function measureText(props, withoutRects) {
   const firstLineOffset = (rects.length ? rects[0].top - topRect.top : 0);
   const baseline = (rects.length ? rects[0].bottom - topRect.top : 0);
   // console.log(baseline / measureScaleFactor);
+  let width = 0;
+  [].forEach.call(rects,(rect) => {
+    width = Math.max(rect.width, width);
+  });
+
   return {
+    width: (width / measureScaleFactor),
     height: (divWrapper.offsetHeight - (2 * firstLineOffset)) / measureScaleFactor,
     firstLineOffset: firstLineOffset / measureScaleFactor,
     baseline: baseline / measureScaleFactor,

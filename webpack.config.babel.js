@@ -25,7 +25,10 @@ process.env.BABEL_ENV = TARGET;
 
 const common = {
   resolve: {
-    extensions: ['', '.js', '.jsx', '.css', '.png', '.jpg']
+    extensions: ['', '.js', '.jsx', '.css', '.png', '.jpg'],
+    alias: {
+      'react-svg-canvas': config.paths.src
+    }
   },
   module: {
     preLoaders: [
@@ -48,6 +51,10 @@ const common = {
         test: /\.png$/,
         loader: 'url?limit=100000&mimetype=image/png',
         include: config.paths.docs
+      },
+      {
+        test: /\.(eot|svg|ttf|woff|woff2).*$/,
+        loader: 'file?name=fonts/[name].[ext]'
       },
       {
         test: /\.jpg$/,

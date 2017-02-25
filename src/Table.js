@@ -6,20 +6,18 @@ export default class Table extends Element {
 
   static defaultProps = Object.assign({}, Element.defaultProps, {
     selectable: false,
-    rowPadding: 10
+    rowPadding: 0
   });
 
   constructor(props, context) {
     super(props, context);
-
-    this.rows = [];
   }
 
   childSizeChanged() {
     const heights = {};
     let lastPos = 0;
     let height = 0;
-    this.rows.forEach((row, i) => {
+    this.rowContainer.childNodes.forEach((row, i) => {
       if (row) {
         height = row.getBBox().height;
         heights[`rowY${i}`] = lastPos;
@@ -30,17 +28,23 @@ export default class Table extends Element {
     super.childSizeChanged();
   }
 
+  handleRowContainer = (ref) => {
+    this.rowContainer = ref;
+  };
+
   renderChildren() {
     let children = this.props.children;
     if (!(children instanceof Array)) {
       children = [children];
     }
-    return children.map((child, i) => (
-      <g
-        key={i} ref={(ref) => { this.rows[i] = ref; }}
-        transform={`translate(0, ${this.state[`rowY${i}`] || 0})`}
-      >{child}</g>)
-    );
+    return <g ref={this.handleRowContainer}>
+      {children.map((child, i) => (
+        <g
+          key={child.id || i}
+          transform={`translate(0, ${this.state[`rowY${i}`] || 0})`}
+        >{child}</g>)
+      )}
+    </g>
   }
 
 }

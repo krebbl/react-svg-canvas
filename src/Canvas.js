@@ -19,7 +19,8 @@ export default class Canvas extends React.Component {
 
   static childContextTypes = {
     canvas: PropTypes.object,
-    api: PropTypes.object
+    api: PropTypes.object,
+    zoom: PropTypes.number
   };
 
   constructor(props, context) {
@@ -45,7 +46,8 @@ export default class Canvas extends React.Component {
   getChildContext() {
     return {
       canvas: this,
-      api: this.props.api
+      api: this.props.api,
+      zoom: this.props.zoom
     };
   }
 
@@ -74,11 +76,24 @@ export default class Canvas extends React.Component {
     }
   }
 
+  componentWillReceiveProps(nextProps) {
+    if (nextProps.api !== this.props.api && nextProps.api) {
+      this.props.api.unbind('selectionChanged', this.handleSelectionChange);
+      this.props.api.unbind('dataChanged', this.handleDataChange);
+
+      nextProps.api.bind('selectionChanged', this.handleSelectionChange);
+      nextProps.api.bind('dataChanged', this.handleDataChange);
+
+      this.handleDataChange();
+      this.handleSelectionChange();
+    }
+  }
+
   componentDidUpdate(prevProps, prevState) {
     if (!prevState.readyForRender && this.state.readyForRender) {
       this.positionSlide();
       this.props.onFirstRender && this.props.onFirstRender(this);
-    } else if (this.state.readyForRender && prevProps.zoom !== this.props.zoom) {
+    } else if (this.state.readyForRender && (prevProps.zoom !== this.props.zoom || this.state.slide !== prevState.slide)) {
       this.positionSlide();
     }
 
@@ -175,7 +190,10 @@ export default class Canvas extends React.Component {
         width={this.state.width || '100%'} height={this.state.height || '100%'}
         ref={this.handleRootRef}
         shapeRendering="geometricPrecision"
-        onMouseDown={this.handleMouseDown} onMouseUp={this.handleMouseUp}
+        onTouchStart={this.handleMouseDown}
+        onMouseDown={this.handleMouseDown}
+        onMouseUp={this.handleMouseUp}
+        onTouchEnd={this.handleMouseUp}
       >
 
         <g ref={this.handleRef}>

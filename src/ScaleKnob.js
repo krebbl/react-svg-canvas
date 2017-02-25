@@ -36,6 +36,10 @@ export default class ScaleKnob extends React.Component {
     y: 0
   };
 
+  static contextTypes = {
+    zoom: PropTypes.number
+  };
+
   handleStartDrag = (e) => {
     this.lastPoint = e.startPoint;
     const svgRoot = this.node.ownerSVGElement;
@@ -44,6 +48,7 @@ export default class ScaleKnob extends React.Component {
     this.rootPoint = svgRoot.createSVGPoint();
     this.scalePoint = svgRoot.createSVGPoint();
     e.nativeEvent.stopPropagation();
+    document.activeElement.blur();
   };
 
   handleDrag = (e) => {
@@ -76,20 +81,20 @@ export default class ScaleKnob extends React.Component {
   renderInner() {
     return <g>
       <circle
-        r={10} fill="transparent"
+        r={8 / this.context.zoom} fill="transparent"
       />
       <circle
-        r={8} fill="white"
+        r={6 / this.context.zoom} fill="white"
       />
       <circle
-        r={6} fill="blue"
+        r={4 / this.context.zoom} fill="#3a7ed2"
       />
     </g>;
   }
 
   handleRef = (ref) => {
     this.node = ref;
-  }
+  };
 
   render() {
     return (<Draggable

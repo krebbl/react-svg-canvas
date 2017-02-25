@@ -13,6 +13,8 @@ export default class Element extends React.Component {
     moving: false
   };
 
+  isGroup = false;
+
   static propTypes = {
     _id: PropTypes.string,
     x: PropTypes.number,
@@ -23,8 +25,10 @@ export default class Element extends React.Component {
     children: PropTypes.node,
     movable: PropTypes.bool,
     moveDelegate: PropTypes.instanceOf(Element),
+    selectDelegate: PropTypes.instanceOf(Element),
     selectable: PropTypes.bool,
-    scalable: PropTypes.bool
+    scalable: PropTypes.bool,
+    hoverOnBBox: PropTypes.bool
   };
 
   static defaultProps = {
@@ -34,7 +38,8 @@ export default class Element extends React.Component {
     selectable: true,
     scalable: true,
     movable: true,
-    onChange: null
+    onChange: null,
+    hoverOnBBox: true
   };
 
   type = 'core';
@@ -42,16 +47,19 @@ export default class Element extends React.Component {
   static contextTypes = {
     api: PropTypes.instanceOf(Api),
     canvas: PropTypes.object,
-    parentElement: PropTypes.object
+    parentElement: PropTypes.object,
+    group: PropTypes.object
   };
 
   static childContextTypes = {
-    parentElement: PropTypes.object
+    parentElement: PropTypes.object,
+    group: PropTypes.object
   };
 
   getChildContext() {
     return {
-      parentElement: this
+      parentElement: this,
+      group: this.isGroup ? this : this.context.group
     };
   }
 
@@ -282,7 +290,7 @@ export default class Element extends React.Component {
       }
       if (trigger) {
         this.context.api.dataChanged();
-        if(this.context.api.isNodeSelected(this)) {
+        if (this.context.api.isNodeSelected(this)) {
           this.context.api.selectionChanged();
         }
       }
@@ -294,11 +302,18 @@ export default class Element extends React.Component {
     this.mouseMoved = false;
     if (this.props.selectable) {
       e.stopPropagation();
-      this.context.api.selectNode(this);
+      if (this.props.selectDelegate) {
+        this.props.selectDelegate.handleMouseDown(e);
+      } else if (this.context.group) {
+        this.context.group.handleMouseDown(e);
+      }
+      this.context.api.selectNode(this, this.props.selectDelegate || this.context.group);
       if (this.props.movable) {
         this.handleDragStart(e);
       } else if (this.props.moveDelegate) {
         this.props.moveDelegate.handleDragStart(e);
+      } else if (this.context.group) {
+        this.context.group.handleDragStart(e);
       }
     }
   };
@@ -328,7 +343,6 @@ export default class Element extends React.Component {
       if (!this.isSelected()) {
         this.context.api.selectNode(this);
       }
-
       const changedEvent = e.touches ? e.touches[0] : e;
       this.movePoint.x = changedEvent.pageX;
       this.movePoint.y = changedEvent.pageY;
@@ -356,6 +370,15 @@ export default class Element extends React.Component {
     this.contentNode = ref;
   };
 
+  handleMouseEnter = (e) => {
+    e.stopPropagation();
+    this.setState({hovered: true});
+  };
+
+  handleMouseLeave = () => {
+    this.setState({hovered: false});
+  };
+
   childSizeChanged() {
     this.applyTransformation();
   }
@@ -366,11 +389,12 @@ export default class Element extends React.Component {
 
   notifySizeChanged() {
     this.context.api.updateSelection(this);
+    this.props.onSizeChange && this.props.onSizeChange(this);
     this.context.parentElement && this.context.parentElement.childSizeChanged();
   }
 
   handleBBoxRef = (ref) => {
-    this.bboxNode = ref;
+    this.bboxNode = this.bboxNode || ref;
   };
 
   render() {
@@ -387,11 +411,21 @@ export default class Element extends React.Component {
         transform={transform}
         onMouseDown={this.handleMouseDown}
         onTouchStart={this.handleMouseDown}
+        onMouseOver={this.handleMouseEnter}
+        onMouseOut={this.handleMouseLeave}
       >
         {selectable ? <g ref={this.handleBBoxRef} transform={`translate(${this.state.bboxX || 0}, ${this.state.bboxY || 0})`}>
           <rect
-            width={this.state.width}
-            height={this.state.height} fill="transparent"
+            style={this.props.hoverOnBBox ? null : {pointerEvents: 'none'}}
+            x={this.state.width < 0 ? this.state.width : 0}
+            y={this.state.height < 0 ? this.state.height : 0}
+            width={Math.abs(this.state.width || 0)}
+            height={Math.abs(this.state.height || 0)}
+            stroke="gray"
+            vectorEffect="non-scaling-stroke"
+            strokeDasharray="5 5"
+            strokeWidth={this.state.hovered && !this.isSelected() ? 1 : 0}
+            fill="transparent"
           />
         </g> : null}
         <g ref={this.handleContentRef}>

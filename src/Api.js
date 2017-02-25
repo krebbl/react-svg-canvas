@@ -32,7 +32,7 @@ export default class Api extends EventDispatcher {
       selections: Immutable({})
     });
     this.selectedNodes = {};
-    this.paths = {};       
+    this.paths = {};
   }
 
   static create(apiTree, selectedElements) {
@@ -54,7 +54,8 @@ export default class Api extends EventDispatcher {
 
     const newElement = Object.assign({}, Factory.defaultDataProps, {
       _factory: Factory,
-      _id: props._id || generateUIDNotMoreThan1million()
+      _id: props._id || generateUIDNotMoreThan1million(),
+      _key: k[k.length - 1]
     }, props);
 
     const elementsToAdd = [];
@@ -79,12 +80,14 @@ export default class Api extends EventDispatcher {
       }
     });
 
+
     const targetPath = path.concat(k);
     this.slide = this.slide.setIn(['elements'].concat(targetPath), newElement);
     this.addPath(newElement._id, targetPath);
     elementsToAdd.forEach((el) => {
       this.addElement(el.factory, el.props, el.key, newElement._id);
     });
+    return newElement;
   }
 
   addPath(id, path) {
@@ -92,6 +95,11 @@ export default class Api extends EventDispatcher {
       return;
     }
     this.paths[id] = path;
+  }
+
+  updateSlide(key, value) {
+    const k = keyToArray(key);
+    this.slide = this.slide.setIn(k, value);
   }
 
   removeElement(id, key) {
@@ -127,6 +135,22 @@ export default class Api extends EventDispatcher {
     } else {
       console.warn(`You tried to update a non existing element width id: ${id}`)
     }
+  }
+
+  cloneElement(id) {
+    const path = this.getDataPath(id);
+    const element = getInPath(this.slide.elements, path);
+    let key = path.pop();
+    let arrayKey;
+    if (typeof (key) === 'number') {
+      arrayKey = path.pop();
+    }
+    const parent = getInPath(this.slide.elements, path);
+    if (arrayKey) {
+      key = [arrayKey, parent[arrayKey].length];
+    }
+    const mutable = element.without('_id').asMutable({deep: true});
+    return this.addElement(element._factory, mutable, key, parent._id);
   }
 
   getValue(id, key) {

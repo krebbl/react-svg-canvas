@@ -8,3 +8,8 @@ text.no-select {
   /* Non-prefixed version, currentlysupported by Chrome and Opera */
   cursor: default;
 }
+
+
+rect {
+  transition: stroke-width 250ms;
+}

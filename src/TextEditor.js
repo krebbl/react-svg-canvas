@@ -17,7 +17,8 @@ export default class TextEditor extends React.Component {
     lineHeight: 1,
     textAlign: 'left',
     width: 100,
-    height: 100
+    height: 100,
+    fill: 'black'
   };
 
   static propTypes = {
@@ -30,9 +31,7 @@ export default class TextEditor extends React.Component {
   static contextTypes = {
     canvas: PropTypes.object
   };
-
-
-
+  
   componentDidMount() {
     if (this.state.active) {
       this.renderEditable();
@@ -69,7 +68,8 @@ export default class TextEditor extends React.Component {
       style.padding = '0';
       style.transformOrigin = '0 0';
       style.textRendering = 'geometricPrecision';
-
+      style.color = this.props.fill;
+      console.log(this.props.fill);
       this._target.setAttribute('contenteditable', 'true');
 
 

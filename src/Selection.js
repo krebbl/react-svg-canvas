@@ -17,20 +17,27 @@ export default class Selection extends React.Component {
 
   render() {
     const selection = this.props;
+    const rectProps = {
+      x: selection.width < 0 ? selection.width : 0,
+      y: selection.height < 0 ? selection.height : 0,
+      width: Math.abs(selection.width),
+      height: Math.abs(selection.height)
+    };
     return (<g transform={selection.transform}>
       <g style={innerSelectionStyle}>
         <rect
-          width={selection.width}
-          height={selection.height}
+          {...rectProps}
           fill="transparent"
         />
       </g>
       {selection.editor}
       <g style={innerSelectionStyle}>
         <rect
-          width={selection.width} height={selection.height} fill="transparent"
+          {...rectProps}
+          fill="transparent"
           vectorEffect="non-scaling-stroke"
-          stroke="blue" strokeWidth="0.5"
+          stroke="gray" strokeWidth="0.5"
+          strokeOpacity="0.5"
         />
       </g>
       <g>

@@ -8,10 +8,11 @@ export default class Timeline extends Element {
   type = 'timeline';
 
   static defaultProps = Object.assign({}, Element.defaultProps, {
-    selectable: true,
     milestones: [],
+    selectable: true,
     resizable: false,
-    movable: false
+    movable: false,
+    snapable: false
   });
 
   static childrenTypes = {

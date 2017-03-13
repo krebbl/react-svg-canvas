@@ -53,23 +53,11 @@ export default class Milestone extends Element {
     super.processChange(key, value, trigger);
   }
 
-  createKnobs() {
-    var ret = super.createKnobs();
+  renderKnobs() {
+    const ret = super.renderKnobs();
     ret.shift();
 
     return ret;
-  }
-
-  getForm() {
-    return [{
-      type: 'number',
-      key: 'width',
-      title: 'Width'
-    }, {
-      type: 'text',
-      key: 'color',
-      title: 'Color'
-    }];
   }
 
   handleSizeChange = (ref) => {
@@ -103,9 +91,9 @@ export default class Milestone extends Element {
           onSizeChange={this.handleSizeChange}
         />
         <g transform={`translate(0, ${this.state.textHeight || 12})`}>
-          <line x1="0" x2="0" y1={10} y2={100 - bigCircleRadius + 10} stroke="gray" strokeWidth="1"/>
-          <circle r={bigCircleRadius} stroke="gray" strokeWidth="1" cy={100 + 10} fill="transparent"/>
-          <FontIcon {...this.props.iconProps} movable={false} y={100 + 10} size={26} fill={smallCircleColor}/>
+          <line x1="0" x2="0" y1={10} y2={100 - bigCircleRadius + 10} stroke="gray" strokeWidth="1" />
+          <circle r={bigCircleRadius} stroke="gray" strokeWidth="1" cy={100 + 10} fill="transparent" />
+          <FontIcon {...this.props.iconProps} movable={false} y={100 + 10} size={26} fill={smallCircleColor} />
 
           <line
             x1="0" x2="0"
@@ -124,14 +112,14 @@ export default class Milestone extends Element {
           maxWidth={200}
           movable={false}
           scalable={false} textAlign="left"
-          fontSize={14} background="white"
+          fontSize={14} background={this.context.slide.background}
         />
         <Text
           {...this.props.contentProps}
           maxWidth={200}
           movable={false}
           scalable={false} textAlign="left"
-          fontSize={12} background="white"
+          fontSize={12} background={this.context.slide.background}
         />
       </Table>
     </g>);

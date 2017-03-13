@@ -1,7 +1,21 @@
 import React, {PropTypes} from 'react';
 import bowser from 'bowser';
+import EventListener, {withOptions} from 'react-event-listener';
 
 const wrapProperties = ['text', 'fontSize', 'fontFamily', 'verticalAlign', 'lineHeight', 'textAlign', 'width'];
+
+function setInnerText(target, text) {
+  if (text !== target.textContent) {
+    target.innerHTML = `<span>${text.replace(/\r?\n/gi, '<br/>')}</span>`;
+  }
+}
+
+function getInnerText(target) {
+  if (!target) {
+    return '';
+  }
+  return target.innerText.replace(/^\n$/, "");
+}
 
 export default class TextEditor extends React.Component {
 
@@ -16,8 +30,6 @@ export default class TextEditor extends React.Component {
     verticalAlign: 'top',
     lineHeight: 1,
     textAlign: 'left',
-    width: 100,
-    height: 100,
     fill: 'black'
   };
 
@@ -31,7 +43,7 @@ export default class TextEditor extends React.Component {
   static contextTypes = {
     canvas: PropTypes.object
   };
-  
+
   componentDidMount() {
     if (this.state.active) {
       this.renderEditable();
@@ -44,6 +56,8 @@ export default class TextEditor extends React.Component {
     }
     if (!this.state.active) {
       this.removeEditable();
+    } else {
+      this.repositionTextArea();
     }
   }
 
@@ -61,7 +75,7 @@ export default class TextEditor extends React.Component {
       style.background = 'transparent';
       style.zIndex = '1000';
       style.outline = 'none';
-      style.whiteSpace = 'pre-wrap';
+      style.whiteSpace = this.props.width === 'auto' ? 'nobreak' : 'pre-wrap';
       style.border = 'none';
       style.wordBreak = 'break-word';
       style.wordWrap = 'break-word'; // for FF
@@ -69,22 +83,13 @@ export default class TextEditor extends React.Component {
       style.transformOrigin = '0 0';
       style.textRendering = 'geometricPrecision';
       style.color = this.props.fill;
-      console.log(this.props.fill);
       this._target.setAttribute('contenteditable', 'true');
 
+      this._target.oninput = this.triggerChange;
 
-      this._target.onkeydown = (e) => {
-        if (bowser.msie && e.which === 13) {
-          e.preventDefault();
-          // TODO: insert line break instead of paragraph
-        }
-      };
-      this._target.onkeyup = (e) => {
-        this.props.onTextChange && this.props.onTextChange(e);
-      };
-      this._target.onchange = (e) => {
-        this.props.onTextChange && this.props.onTextChange(e);
-      };
+      this._target.onpaste = this.triggerChange;
+
+      this._target.onchange = this.triggerChange;
 
       this._target.onblur = () => {
         this.props.onBlur && this.props.onBlur();
@@ -96,7 +101,7 @@ export default class TextEditor extends React.Component {
     const target = this._target;
     wrapProperties.forEach((key) => {
       if (this.props[key] && key !== 'text') {
-        if (/width|height|fontSize/.test(key)) {
+        if (/width|height|fontSize/.test(key) && typeof this.props[key] === 'number') {
           target.style[key] = `${this.props[key]}px`;
         } else {
           target.style[key] = `${this.props[key]}`;
@@ -104,21 +109,73 @@ export default class TextEditor extends React.Component {
       }
     });
 
-    if (this.props.text !== target.textContent) {
-      target.innerHTML = `<span>${this.props.text.replace(/\r?\n/gi, '<br/>')}</span>`;
+    setInnerText(target, this.props.text);
+
+    if (bowser.msie) {
+      this._textBeforeForIE = target.innerHTML;
+      const checkForChange = () => {
+        if (target.innerHTML !== this._textBeforeForIE) {
+          this._textBeforeForIE = target.innerHTML;
+          this.triggerChange();
+        }
+      };
+
+      this._checking = false;
+      const startChecking = () => {
+        checkForChange();
+        this._checking && setTimeout(startChecking, 10);
+      };
+
+      const stopChecking = () => {
+        this._checking = false;
+      };
+
+      target.onkeyup = () => {
+        stopChecking();
+      };
+      target.onkeydown = (e) => {
+        if (e.which === 13 && !e.shiftKey) {
+          e.preventDefault();
+          e.stopPropagation();
+
+          const selection = window.getSelection();
+          const range = selection.getRangeAt(0);
+          const br = document.createElement('br');
+
+          range.deleteContents();
+          range.insertNode(br);
+          range.setStartAfter(br);
+          range.setEndAfter(br);
+          range.collapse(false);
+          selection.removeAllRanges();
+          selection.addRange(range);
+        }
+        setTimeout(() => {
+          startChecking();
+        }, 5);
+      };
     }
+
     this.positionEditable(target);
     target.focus();
   }
+
   componentWillUnmount() {
     this.removeEditable();
   }
+
+  triggerChange = () => {
+    const target = this._target;
+    if (!target) {
+      return;
+    }
+    this.props.onTextChange && this.props.onTextChange(getInnerText(target));
+  };
 
   removeEditable() {
     if (this._target && this._target.parentNode) {
       this._target.parentNode.removeChild(this._target);
       this._target = null;
-      this.props.onBlur && this.props.onBlur();
     }
   }
 
@@ -138,22 +195,31 @@ export default class TextEditor extends React.Component {
   }
 
   activate() {
-    this.setState({ active: true });
+    this.setState({active: true});
   }
 
   deactivate() {
-    this.setState({ active: false });
+    this.setState({active: false});
   }
+
+  handleResize = () => {
+    this.resizeTimeout && clearTimeout(this.resizeTimeout);
+
+    this.resizeTimeout = setTimeout(() => {
+      this.repositionTextArea();
+    }, 100);
+  };
 
   render() {
     return <g transform={`translate(${this.props.x || 0}, ${this.props.y || 0})`}>
+      <EventListener target="window" onResize={this.handleResize}/>
       {this.state.active ?
         <rect
           ref={this.handleRef}
           style={{pointerEvent: 'none'}}
           fill="transparent"
-          width={this.props.width}
-          height={this.props.height}
+          width={10}
+          height={10}
         /> : null}
     </g>;
   }

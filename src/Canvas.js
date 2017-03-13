@@ -1,7 +1,5 @@
 import React, {PropTypes} from 'react';
 import Api from './Api';
-import Selection from './Selection';
-import './css/common.css';
 
 const wrapperStyle = {width: '100%', height: '100%', overflow: 'auto', position: 'absolute'};
 
@@ -19,8 +17,7 @@ export default class Canvas extends React.Component {
 
   static childContextTypes = {
     canvas: PropTypes.object,
-    api: PropTypes.object,
-    zoom: PropTypes.number
+    api: PropTypes.object
   };
 
   constructor(props, context) {
@@ -30,11 +27,14 @@ export default class Canvas extends React.Component {
     this.api.on('selectionChanged', this.handleSelectionChange);
     this.api.on('dataChanged', this.handleDataChange);
 
+    this.snaplines = {};
+    this.nodes = {};
+
     this.state = {
       readyForRender: false,
       width: 0,
       height: 0,
-      selections: null,
+      selection: this.api.selection,
       slide: this.api.slide,
       slideLeft: 0,
       slideTop: 0
@@ -46,18 +46,18 @@ export default class Canvas extends React.Component {
   getChildContext() {
     return {
       canvas: this,
-      api: this.props.api,
-      zoom: this.props.zoom
+      api: this.props.api
     };
   }
 
   componentWillUnmount() {
-    this.api.unbind('selectionChanged', this.handleSelectionChange);
+    // this.api.unbind('selectionChanged', this.handleSelectionChange);
     this.api.unbind('dataChanged', this.handleDataChange);
   }
 
   componentDidMount() {
     this.checkIfReadyForRender();
+    document.addEventListener('keydown', this.handleKeyDown);
   }
 
   checkIfReadyForRender() {
@@ -128,15 +128,89 @@ export default class Canvas extends React.Component {
     }
   }
 
+  findSnaplines(node, snaplines) {
+    const matchingSnaplines = [];
+    const matchedSnapline = {};
+    const diffs = {x: 0, y: 0};
+    (this.state.snaplines || []).forEach(s => s.ref.highlight(false));
+    const maxDiff = {x: 5, y: 5};
+    (snaplines || []).forEach((tmpSnapline) => {
+      tmpSnapline = matchedSnapline[tmpSnapline.mode] || tmpSnapline;
+      this.possibleSnaplines.forEach((snapline) => {
+        const diff = tmpSnapline.pos - snapline.pos;
+        if (tmpSnapline.mode === snapline.mode && Math.abs(diff) <= maxDiff[tmpSnapline.mode]) {
+          maxDiff[tmpSnapline.mode] = 0;
+          matchingSnaplines.push(snapline);
+          matchedSnapline[tmpSnapline.mode] = matchedSnapline[tmpSnapline.mode] || snapline;
+          diffs[tmpSnapline.mode] = diffs[tmpSnapline.mode] || diff;
+        }
+      });
+    });
+
+    matchingSnaplines.forEach((s) => {
+      s.ref.highlight(true);
+    });
+
+    this.setState({
+      snaplines: matchingSnaplines
+    });
+    return diffs;
+  }
+
+  registerNode(node) {
+    this.nodes[node.id] = node;
+  }
+
+  unregisterNode(node) {
+    delete this.nodes[node.id];
+  }
+
+  clearSnaplines() {
+    this.state.snaplines.forEach(s => s.ref.highlight(false));
+    this.setState({
+      snaplines: null
+    });
+  }
+
+  prepareSnaplines(node) {
+    let possibleSnaplines = [];
+    Object.keys(this.nodes).forEach((nodeId) => {
+      const oNode = this.nodes[nodeId];
+      if (nodeId !== node.id && !node.contains(oNode)) {
+        possibleSnaplines = possibleSnaplines.concat(oNode.getCurrentSnaplines());
+      }
+    });
+
+    this.possibleSnaplines = possibleSnaplines;
+  }
+
+  handleKeyDown = (e) => {
+    const api = this.props.api;
+    if (e.srcElement === document.body) {
+      if (e.which === 8 || e.which === 46) {
+        api.removeSelectedElements();
+        api.dataChanged();
+        api.selectionChanged();
+      } else if (e.which === 90 && e.metaKey) {
+        if (!e.shiftKey) {
+          api.undo();
+        } else {
+          api.redo();
+        }
+      }
+    }
+  };
+
   handleDataChange = () => {
     this.setState({
-      slide: this.api.slide
+      slide: this.api.slide,
+      selection: this.api.selection
     });
   };
 
   handleSelectionChange = () => {
     this.setState({
-      selections: this.api.getSelections()
+      selection: this.api.selection
     });
   };
 
@@ -155,7 +229,7 @@ export default class Canvas extends React.Component {
 
   triggerSelection() {
     // todo: implement multiple selections
-    this.props.api.selectNode(null);
+    this.props.api.selectElement(null);
   }
 
   handleSelectionRefs = (ref) => {
@@ -201,17 +275,27 @@ export default class Canvas extends React.Component {
             <rect
               width={this.state.slide.width}
               height={this.state.slide.height}
-              fill="white"
+              fill={this.state.slide.background}
             />
             <g className="slide-elements">
               {this.state.slide.elements.map((el) => {
-                const {_factory, _id, ...other} = el;
-                return React.createElement(_factory, {key: _id, _id: _id, ...other});
+                const factory = this.props.api.resolveFactory(el.type);
+                const {_id, ...other} = el;
+                return React.createElement(factory, {key: _id, _id: _id, ...other});
+              })}
+            </g>
+            <g className="snaplines">
+              {(this.state.snaplines || []).map((snapline, i) => {
+                if (snapline.mode === 'x') {
+                  return <line key={i} vectorEffect="non-scaling-stroke" strokeDasharray="5 5" stroke="blue" strokeWidth="0.1" y1={0} y2={this.state.slide.height} x1={snapline.pos} x2={snapline.pos}/>
+                } else {
+                  return <line key={i} vectorEffect="non-scaling-stroke" strokeDasharray="5 5" stroke="blue" strokeWidth="0.1" x1={0} x2={this.state.slide.width} y1={snapline.pos} y2={snapline.pos}/>
+                }
               })}
             </g>
           </g>
           <g ref={this.handleSelectionRefs} className="slide-selections">
-            {this.state.selections}
+            {Object.keys(this.state.selection).filter(id => !!this.nodes[id]).map(id => this.nodes[id].renderSelection())}
           </g>
         </g>
       </svg>

@@ -8,24 +8,27 @@ export default class Table extends Element {
     selectable: false,
     rowPadding: 0
   });
+  
+  componentDidUpdate(prevProps, prevState) {
+    if (prevState.rowHeights !== this.state.rowHeights) {
+      this.applyTransformation();
+    }
 
-  constructor(props, context) {
-    super(props, context);
+    super.componentDidUpdate(prevProps, prevState);
   }
 
   childSizeChanged() {
-    const heights = {};
+    let heights = this.state.rowHeights || Immutable({});
     let lastPos = 0;
     let height = 0;
     this.rowContainer.childNodes.forEach((row, i) => {
       if (row) {
         height = row.getBBox().height;
-        heights[`rowY${i}`] = lastPos;
+        heights = heights.set(`rowY${i}`, lastPos);
         lastPos += height + this.props.rowPadding;
       }
     });
-    this.setState(heights);
-    super.childSizeChanged();
+    this.setState({rowHeights: heights});
   }
 
   handleRowContainer = (ref) => {
@@ -37,11 +40,12 @@ export default class Table extends Element {
     if (!(children instanceof Array)) {
       children = [children];
     }
+    const heights = this.state.rowHeights || {};
     return <g ref={this.handleRowContainer}>
       {children.map((child, i) => (
         <g
           key={child.id || i}
-          transform={`translate(0, ${this.state[`rowY${i}`] || 0})`}
+          transform={`translate(0, ${heights[`rowY${i}`] || 0})`}
         >{child}</g>)
       )}
     </g>

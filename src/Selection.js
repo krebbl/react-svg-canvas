@@ -10,10 +10,19 @@ export default class Selection extends React.Component {
   static defaultProps = {};
 
   static contextTypes = {
-    zoom: PropTypes.number,
     canvas: PropTypes.object,
     api: PropTypes.object
   };
+
+  static childContextTypes = {
+    matrix: PropTypes.object
+  };
+
+  getChildContext() {
+    return {
+      matrix: this.props.matrix
+    };
+  }
 
   render() {
     const selection = this.props;
@@ -23,7 +32,8 @@ export default class Selection extends React.Component {
       width: Math.abs(selection.width),
       height: Math.abs(selection.height)
     };
-    return (<g transform={selection.transform}>
+    const matrix = selection.matrix;
+    return (<g transform={`matrix(${[matrix.a, matrix.b, matrix.c, matrix.d, matrix.e, matrix.f].join(',')})`}>
       <g style={innerSelectionStyle}>
         <rect
           {...rectProps}

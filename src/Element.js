@@ -3,14 +3,15 @@ import objectDiff from 'object-diff';
 import shallowequal from 'shallowequal';
 import Api from './Api';
 import Selection from './Selection';
-import ScaleKnob from'./ScaleKnob';
+import ScaleKnob from './ScaleKnob';
 
 export default class Element extends React.Component {
 
   state = {
     bboxX: 0,
     bboxY: 0,
-    moving: false
+    moving: false,
+    highlight: false
   };
 
   isGroup = false;
@@ -28,6 +29,8 @@ export default class Element extends React.Component {
     selectDelegate: PropTypes.instanceOf(Element),
     selectable: PropTypes.bool,
     scalable: PropTypes.bool,
+    snapable: PropTypes.bool,
+    hoverable: PropTypes.bool,
     hoverOnBBox: PropTypes.bool
   };
 
@@ -37,6 +40,8 @@ export default class Element extends React.Component {
     rotate: 0,
     selectable: true,
     scalable: true,
+    snapable: true,
+    hoverable: true,
     movable: true,
     onChange: null,
     hoverOnBBox: true
@@ -67,6 +72,28 @@ export default class Element extends React.Component {
     super(props, context);
     this.firstRender = true;
     this.id = props._id;
+    if (!context.api) {
+      throw new Error('Api missing on context');
+    }
+    if (!context.canvas) {
+      throw new Error('Canvas missing on context');
+    }
+
+    context.api.on('selectionChanged', this.handleSelectionChange);
+
+    this.state = {
+      selected: !!context.api.isElementSelected(this.id)
+    };
+  }
+
+  handleSelectionChange = () => {
+    this.setState({
+      selected: this.context.api.isElementSelected(this.id)
+    });
+  };
+
+  shouldComponentUpdate(nextProps, nextState, nextContext) {
+    return !shallowequal(this.props, nextProps) || !shallowequal(this.state, nextState) || !shallowequal(this.context, nextContext);
   }
 
   updateProp(key, value) {
@@ -77,16 +104,20 @@ export default class Element extends React.Component {
     this.context.api.dataChanged();
   }
 
-  createKnobs() {
+  handleKnobDone = () => {
+    this.context.api.saveInHistory();
+  };
+
+  renderKnobs() {
     const knobs = [];
     if (this.props.scalable) {
       if (this.props.width != null) {
-        knobs.push(<ScaleKnob key="l" dir="l" y={this.actualHeight() * 0.5} onChange={this.handleKnobChange}/>);
-        knobs.push(<ScaleKnob key="r" dir="r" x={this.actualWidth()} y={this.actualHeight() * 0.5} onChange={this.handleKnobChange}/>);
+        knobs.push(<ScaleKnob key="l" dir="l" y={this.actualHeight() * 0.5} onChange={this.handleKnobChange} onDone={this.handleKnobDone}/>);
+        knobs.push(<ScaleKnob key="r" dir="r" x={this.actualWidth()} y={this.actualHeight() * 0.5} onChange={this.handleKnobChange} onDone={this.handleKnobDone}/>);
       }
       if (this.props.height != null) {
-        knobs.push(<ScaleKnob key="t" dir="t" x={this.actualWidth() * 0.5} onChange={this.handleKnobChange}/>);
-        knobs.push(<ScaleKnob key="b" dir="b" x={this.actualWidth() * 0.5} y={this.actualHeight()} onChange={this.handleKnobChange}/>);
+        knobs.push(<ScaleKnob key="t" dir="t" x={this.actualWidth() * 0.5} onChange={this.handleKnobChange} onDone={this.handleKnobDone}/>);
+        knobs.push(<ScaleKnob key="b" dir="b" x={this.actualWidth() * 0.5} y={this.actualHeight()} onChange={this.handleKnobChange} onDone={this.handleKnobDone}/>);
       }
     }
     // if (this.props.rotatable) {
@@ -107,7 +138,7 @@ export default class Element extends React.Component {
     return this.props.height || this.state.height || 0;
   }
 
-  createSelection() {
+  renderSelection() {
     const selectionContainer = this.context.canvas.selections;
     if (!selectionContainer || this.state.moving) {
       return null;
@@ -122,23 +153,17 @@ export default class Element extends React.Component {
       width: Math.ceil(this.actualWidth()),
       height: Math.ceil(this.actualHeight()),
       matrix: matrix,
-      transform: `matrix(${[matrix.a, matrix.b, matrix.c, matrix.d, matrix.e, matrix.f].join(',')})`,
       type: this.type,
-      editor: this.createEditor(),
-      form: this.getForm(),
+      editor: this.renderEditor(),
       onKnobChange: this.handleKnobChange
     };
     return <Selection key={this.id} element={this} {...props}>
-      {this.createKnobs(props.width, props.height)}
+      {this.renderKnobs(props.width, props.height)}
     </Selection>;
   }
 
-  createEditor() {
+  renderEditor() {
     return null;
-  }
-
-  getForm() {
-    return [];
   }
 
   renderChildren() {
@@ -146,35 +171,35 @@ export default class Element extends React.Component {
   }
 
   componentDidUpdate(prevProps, prevState) {
-    if (!shallowequal(prevProps, this.props)) {
-      const diff = objectDiff(prevProps, this.props);
-      const diffKeys = Object.keys(diff).join('');
-      if (/^(x|y|xy|yx)$/.test(diffKeys)) {
-        this.applyBBox(true);
-      } else {
-        this.applyTransformation(prevProps.rotate !== this.props.rotate
-          || prevProps.x !== this.props.x || prevProps.y !== this.props.y);
-      }
-    } else {
-      const sizeChanged = this.state.width !== prevState.width
-        || this.state.height !== prevState.height
-        || this.state.bboxX !== prevState.bboxX
-        || this.state.bboxY !== prevState.bboxY;
-      if (sizeChanged) {
-        this.notifySizeChanged();
-      }
+    const sizeChanged = this.state.width !== prevState.width
+      || this.state.height !== prevState.height
+      || this.state.bboxX !== prevState.bboxX
+      || this.state.bboxY !== prevState.bboxY;
+    if (sizeChanged) {
+      this.notifySizeChanged();
+    } else if (!shallowequal(prevProps, this.props)) {
+      this.applyTransformation(prevProps.rotate !== this.props.rotate
+        || prevProps.x !== this.props.x || prevProps.y !== this.props.y);
     }
+
     if (prevState.moving !== this.state.moving) {
-      this.context.api.updateSelection(this);
+      this.notifySizeChanged();
     }
   }
 
   componentDidMount() {
     this.applyTransformation(true);
-    this.context.api.updateSelection(this);
+    this.context.api.registerNode(this);
+    this.context.canvas.registerNode(this);
   }
 
-  applyBBox(positionChanged) {
+  componentWillUnmount() {
+    this.context.api.unregisterNode(this);
+    this.context.api.off('selectionChanged', this.handleSelectionChange);
+    this.context.canvas.unregisterNode(this);
+  }
+
+  applyTransformation(positionChanged) {
     const bbox = this.calcBBox();
     if (!bbox) return;
     const width = this.props.width != null ? this.props.width : bbox.width;
@@ -193,10 +218,6 @@ export default class Element extends React.Component {
     } else if (positionChanged) {
       this.notifySizeChanged();
     }
-  }
-
-  applyTransformation(positionChanged) {
-    this.applyBBox(positionChanged);
   }
 
   calcBBox() {
@@ -245,7 +266,9 @@ export default class Element extends React.Component {
   }
 
   processKnobChange(knob, dir, diffVector) {
-    var np, newHeight, newWidth;
+    let np;
+    let newHeight;
+    let newWidth;
     switch (dir) {
       case 'b':
         newHeight = this.props.height + diffVector.y;
@@ -283,14 +306,18 @@ export default class Element extends React.Component {
 
   processChange(key, value, trigger = true) {
     if (this.id) {
+      let val = value;
+      if (typeof val === 'number') {
+        // val = Math.round(val * 10) / 10;
+      }
       if (key === 'rotate') {
-        this.context.api.updateElement(this.id, key, value % 360);
+        this.context.api.updateElement(this.id, key, val % 360);
       } else {
-        this.context.api.updateElement(this.id, key, value);
+        this.context.api.updateElement(this.id, key, val);
       }
       if (trigger) {
         this.context.api.dataChanged();
-        if (this.context.api.isNodeSelected(this)) {
+        if (this.state.selected) {
           this.context.api.selectionChanged();
         }
       }
@@ -307,7 +334,12 @@ export default class Element extends React.Component {
       } else if (this.context.group) {
         this.context.group.handleMouseDown(e);
       }
-      this.context.api.selectNode(this, this.props.selectDelegate || this.context.group);
+      if (this.state.selected && e.shiftKey) {
+        this.context.api.deselectElement(this.id);
+      } else {
+        this.context.api.selectElement(this.id, this.props.selectDelegate || this.context.group || e.shiftKey);
+      }
+      this.forceUpdate();
       if (this.props.movable) {
         this.handleDragStart(e);
       } else if (this.props.moveDelegate) {
@@ -319,18 +351,20 @@ export default class Element extends React.Component {
   };
   handleDragStart = (e) => {
     e.preventDefault();
-    const svgRoot = this.context.canvas.svgRoot;
-    const event = e.nativeEvent;
+    e.stopPropagation();
+    const svgRoot = this.svgRoot();
+    let event = e.nativeEvent;
+    event = event.touches ? event.touches[0] : event;
     const pt = svgRoot.createSVGPoint();
-    pt.x = event.pageX;
-    pt.y = event.pageY;
+    pt.x = event.clientX;
+    pt.y = event.clientY;
     this.startPoint = pt.matrixTransform(this.node.parentNode.getScreenCTM().inverse());
-    pt.x = event.pageX;
-    pt.y = event.pageY;
     this.currentPoint = this.startPoint;
     this.startX = this.props.x;
     this.startY = this.props.y;
     this.movePoint = svgRoot.createSVGPoint();
+    this.moved = false;
+    this.context.canvas.prepareSnaplines(this);
     window.addEventListener('mousemove', this.onDrag);
     window.addEventListener('touchmove', this.onDrag);
     window.addEventListener('mouseup', this.onDragEnd);
@@ -340,26 +374,59 @@ export default class Element extends React.Component {
   onDrag = (e) => {
     if (this.movePoint) {
       e.stopPropagation();
-      if (!this.isSelected()) {
-        this.context.api.selectNode(this);
+      if (!this.state.selected) {
+        this.context.api.selectElement(this.id);
+      }
+      if (!this.cursorLayer) {
+        this.cursorLayer = document.createElement('div');
+        this.cursorLayer.style.position = 'absolute';
+        this.cursorLayer.style.top = '0';
+        this.cursorLayer.style.left = '0';
+        this.cursorLayer.style.right = '0';
+        this.cursorLayer.style.bottom = '0';
+        this.cursorLayer.style.cursor = this.node.style.cursor;
+        this.cursorLayer.style.zIndex = '99999';
+
+        document.body.appendChild(this.cursorLayer);
       }
       const changedEvent = e.touches ? e.touches[0] : e;
-      this.movePoint.x = changedEvent.pageX;
-      this.movePoint.y = changedEvent.pageY;
-      const p = this.movePoint.matrixTransform(this.node.parentNode.getScreenCTM().inverse());
+      this.movePoint.x = changedEvent.clientX;
+      this.movePoint.y = changedEvent.clientY;
+      let p = this.movePoint.matrixTransform(this.node.parentNode.getScreenCTM().inverse());
+      this.moved = p.x !== this.startPoint.x || p.y !== this.startPoint.y;
+      let newX = this.startX + (p.x - this.startPoint.x);
+      let newY = this.startY + (p.y - this.startPoint.y);
+      const diffs = this.context.canvas.findSnaplines(this, this.createSnaplines(newX + (this.state.bboxX || 0), newY + (this.state.bboxY || 0), this.actualWidth(), this.actualHeight()));
+      if (diffs.x || diffs.y) {
+        const inverseMatrix = this.context.canvas.slideNode.getCTM();
+        const parentCtm = this.node.parentNode.getCTM().inverse();
+        const multiplied = inverseMatrix.multiply(parentCtm);
+        p.x = diffs.x;
+        p.y = diffs.y;
 
+        newX -= p.x * multiplied.a;
+        newY -= p.y * multiplied.d;
+      }
       this.setState({moving: true});
-      this.processChange('x', this.startX + (p.x - this.startPoint.x), false);
-      this.processChange('y', this.startY + (p.y - this.startPoint.y));
+      this.processChange('x', newX, false);
+      this.processChange('y', newY);
     }
   };
 
   onDragEnd = () => {
+    if (this.cursorLayer) {
+      document.body.removeChild(this.cursorLayer);
+      this.cursorLayer = null;
+    }
     this.setState({moving: false});
     window.removeEventListener('mousemove', this.onDrag);
     window.removeEventListener('touchmove', this.onDrag);
     window.removeEventListener('mouseup', this.onDragEnd);
     window.removeEventListener('touchend', this.onDragEnd);
+    if (this.moved) {
+      this.context.api.saveInHistory();
+      this.context.canvas.clearSnaplines();
+    }
   };
 
   handleRef = (ref) => {
@@ -372,29 +439,115 @@ export default class Element extends React.Component {
 
   handleMouseEnter = (e) => {
     e.stopPropagation();
-    this.setState({hovered: true});
+    if (!this.state.hovered && this.props.hoverable) {
+      this.setState({hovered: true});
+    }
   };
 
-  handleMouseLeave = () => {
-    this.setState({hovered: false});
+  handleMouseOut = () => {
+    if (this.state.hovered) {
+      this.setState({hovered: false});
+    }
   };
+
+  highlight(toggle) {
+    this.setState({highlight: toggle});
+  }
+
+  contains(element) {
+    let parentElement = element.context.parentElement;
+    while (parentElement) {
+      if (parentElement === this) {
+        return true;
+      }
+      parentElement = parentElement.context.parentElement;
+    }
+    return false;
+  }
+
+  createSnaplines(x, y, width, height, rotation) {
+    const snaplines = [];
+    if (!this.props.snapable) {
+      return snaplines;
+    }
+    const svgRoot = this.svgRoot();
+    let pt = svgRoot.createSVGPoint();
+    let pw = svgRoot.createSVGPoint();
+    pt.x = x;
+    pt.y = y;
+    const inverseMatrix = this.context.canvas.slideNode.getCTM().inverse();
+    const parentCtm = this.node.parentNode.getCTM();
+    const multiplied = inverseMatrix.multiply(parentCtm);
+    pt = pt.matrixTransform(multiplied);
+    pw.x = x + width;
+    pw.y = y + height;
+    pw = pw.matrixTransform(multiplied);
+    const w = pw.x - pt.x;
+    const h = pw.y - pt.y;
+
+    snaplines.push({
+      pos: pt.x + (w * 0.5),
+      mode: 'x',
+      ref: this
+    });
+    if (!rotation) {
+      snaplines.push({
+        pos: pt.x,
+        mode: 'x',
+        ref: this
+      });
+
+      snaplines.push({
+        pos: pt.x + w,
+        mode: 'x',
+        ref: this
+      });
+    }
+
+    snaplines.push({
+      pos: pt.y + (h * 0.5),
+      mode: 'y',
+      ref: this
+    });
+
+    if (!rotation) {
+      snaplines.push({
+        pos: pt.y,
+        mode: 'y',
+        ref: this
+      });
+
+      snaplines.push({
+        pos: pt.y + h,
+        mode: 'y',
+        ref: this
+      });
+    }
+
+    return snaplines;
+  }
 
   childSizeChanged() {
     this.applyTransformation();
   }
 
-  isSelected() {
-    return this.context.api.isNodeSelected(this);
+  getCurrentSnaplines() {
+    return this.createSnaplines(this.props.x + (this.state.bboxX || 0), this.props.y + (this.state.bboxY || 0), this.actualWidth(), this.actualHeight());
   }
 
   notifySizeChanged() {
     this.context.api.updateSelection(this);
     this.props.onSizeChange && this.props.onSizeChange(this);
-    this.context.parentElement && this.context.parentElement.childSizeChanged();
+    this.context.group && this.context.group.childSizeChanged();
+  }
+
+  // For parent elements
+  notifyPositionChanged() {
+    this.context.api.updateSelection(this);
   }
 
   handleBBoxRef = (ref) => {
-    this.bboxNode = this.bboxNode || ref;
+    this.bboxNode = ref;
   };
 
   render() {
@@ -403,7 +556,6 @@ export default class Element extends React.Component {
       this.actualWidth(),
       this.actualHeight(),
       this.props.rotate);
-
     return (
       <g
         ref={this.handleRef}
@@ -412,7 +564,7 @@ export default class Element extends React.Component {
         onMouseDown={this.handleMouseDown}
         onTouchStart={this.handleMouseDown}
         onMouseOver={this.handleMouseEnter}
-        onMouseOut={this.handleMouseLeave}
+        onMouseOut={this.handleMouseOut}
       >
         {selectable ? <g ref={this.handleBBoxRef} transform={`translate(${this.state.bboxX || 0}, ${this.state.bboxY || 0})`}>
           <rect
@@ -424,7 +576,7 @@ export default class Element extends React.Component {
             stroke="gray"
             vectorEffect="non-scaling-stroke"
             strokeDasharray="5 5"
-            strokeWidth={this.state.hovered && !this.isSelected() ? 1 : 0}
+            strokeWidth={(this.state.hovered && !this.state.selected) || this.state.moving || this.state.highlight ? 1 : 0}
             fill="transparent"
           />
         </g> : null}

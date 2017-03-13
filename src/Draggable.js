@@ -1,4 +1,4 @@
-import React, {PropTypes} from "react";
+import React, {PropTypes} from 'react';
 
 export default class Draggable extends React.Component {
 
@@ -6,7 +6,8 @@ export default class Draggable extends React.Component {
     onDragStart: PropTypes.func,
     onDrag: PropTypes.func,
     onDragEnd: PropTypes.func,
-    children: PropTypes.node
+    children: PropTypes.node,
+    freezeCursor: PropTypes.bool
   };
 
   componentDidMount() {
@@ -15,19 +16,14 @@ export default class Draggable extends React.Component {
 
   onTouchStart = (e) => {
     e.stopPropagation();
-    e.preventDefault();
-
-    const event = e.nativeEvent;
+    const event = e.touches ? e.touches[0] : e;
     const pt = this.svgRoot.createSVGPoint();
-    pt.x = event.pageX;
-    pt.y = event.pageY;
+    pt.x = event.clientX;
+    pt.y = event.clientY;
     this.currentPoint = null;
-    this.startPoint = pt.matrixTransform(this.svgRoot.getScreenCTM().inverse());
-    const node = this.node;
-    pt.x = event.pageX;
-    pt.y = event.pageY;
-    this.relativeStartPoint = pt.matrixTransform(node.getScreenCTM().inverse());
-
+    this.rootInverse = this.svgRoot.getScreenCTM().inverse();
+    this.startPoint = pt.matrixTransform(this.rootInverse);
+    this.relativeStartPoint = pt.matrixTransform(this.node.getScreenCTM().inverse());
     this.movePoint = this.svgRoot.createSVGPoint();
     this.props.onDragStart && this.props.onDragStart({
       target: this,
@@ -44,23 +40,44 @@ export default class Draggable extends React.Component {
 
   onTouchMove = (e) => {
     if (this.props.onDrag) {
+      if (this.props.freezeCursor && !this.cursorLayer) {
+        this.cursorLayer = document.createElement('div');
+        this.cursorLayer.style.position = 'absolute';
+        this.cursorLayer.style.top = '0';
+        this.cursorLayer.style.left = '0';
+        this.cursorLayer.style.right = '0';
+        this.cursorLayer.style.bottom = '0';
+        this.cursorLayer.style.cursor = this.node.style.cursor;
+        this.cursorLayer.style.zIndex = '99999';
+
+        document.body.appendChild(this.cursorLayer);
+      }
+      this.moved = true;
       e.stopPropagation();
+      e.preventDefault();
+
       const changedEvent = e.touches ? e.touches[0] : e;
-      this.movePoint.x = changedEvent.pageX;
-      this.movePoint.y = changedEvent.pageY;
-      const p = this.movePoint.matrixTransform(this.svgRoot.getScreenCTM().inverse());
+      this.movePoint.x = changedEvent.clientX;
+      this.movePoint.y = changedEvent.clientY;
+      const p = this.movePoint.matrixTransform(this.rootInverse);
       this.currentPoint = p;
       this.props.onDrag({
         target: this,
         startPoint: this.startPoint,
         relativeStartPoint: this.relativeStartPoint,
         point: p,
+        relativePoint: this.movePoint.matrixTransform(this.node.getScreenCTM().inverse()),
         nativeEvent: e
       });
     }
   };
 
   onTouchEnd = (e) => {
+    this.moved = false;
+    if (this.cursorLayer) {
+      document.body.removeChild(this.cursorLayer);
+      this.cursorLayer = null;
+    }
     window.removeEventListener('mousemove', this.onTouchMove);
     window.removeEventListener('touchmove', this.onTouchMove);
     window.removeEventListener('mouseup', this.onTouchEnd);

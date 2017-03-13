@@ -11,5 +11,5 @@ text.no-select {
 
 
 rect {
-  transition: stroke-width 250ms;
+  /*transition: stroke-width 250ms;*/
 }

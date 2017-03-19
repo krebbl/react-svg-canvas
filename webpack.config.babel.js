@@ -1,10 +1,10 @@
-import * as path from "path";
-import webpack from "webpack";
-import ExtractTextPlugin from "extract-text-webpack-plugin";
-import HtmlWebpackPlugin from "html-webpack-plugin";
-import SystemBellPlugin from "system-bell-webpack-plugin";
-import CleanWebpackPlugin from "clean-webpack-plugin";
-import merge from "webpack-merge";
+import * as path from 'path';
+import webpack from 'webpack';
+import ExtractTextPlugin from 'extract-text-webpack-plugin';
+import HtmlWebpackPlugin from 'html-webpack-plugin';
+import SystemBellPlugin from 'system-bell-webpack-plugin';
+import CleanWebpackPlugin from 'clean-webpack-plugin';
+import merge from 'webpack-merge';
 
 const pkg = require('./package.json');
 
@@ -25,7 +25,7 @@ process.env.BABEL_ENV = TARGET;
 
 const common = {
   resolve: {
-    extensions: ['', '.js', '.jsx', '.css', '.png', '.jpg'],
+    extensions: ['', '.js', '.jsx', '.css', '.png', '.jpg', '.styl'],
     alias: {
       'react-svg-canvas': config.paths.src
     }
@@ -62,9 +62,17 @@ const common = {
         include: config.paths.docs
       },
       {
+        test: /\.scss$/,
+        loaders: ['style', 'css', 'sass']
+      },
+      {
+        test: /\.styl$/,
+        loaders: ['style', 'css', 'stylus']
+      },
+      {
         test: /\.json$/,
         loader: 'json',
-        include: path.join(ROOT_PATH, 'package.json')
+        include: [path.join(ROOT_PATH, 'package.json'), config.paths.examples]
       }
     ]
   },

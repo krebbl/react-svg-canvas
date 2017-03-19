@@ -6,6 +6,7 @@ export default class Knob extends React.Component {
   static propTypes = {
     onChange: PropTypes.func,
     onDone: PropTypes.func,
+    onStart: PropTypes.func,
     inner: PropTypes.node
   };
 
@@ -15,11 +16,15 @@ export default class Knob extends React.Component {
   };
 
   static contextTypes = {
+    api: PropTypes.object,
     matrix: PropTypes.object
   };
 
-  handleStartDrag = () => {
+  handleStartDrag = (e) => {
     document.activeElement.blur();
+    e.nativeEvent.preventDefault();
+    this.context.api.startChange();
+    this.props.onStart && this.props.onStart();
   };
 
   handleDrag = (e) => {
@@ -28,6 +33,7 @@ export default class Knob extends React.Component {
 
   handleDragEnd = (e) => {
     e.nativeEvent.stopPropagation();
+    this.context.api.finishChange();
     this.props.onDone && this.props.onDone();
   };
 

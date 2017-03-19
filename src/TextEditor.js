@@ -75,7 +75,7 @@ export default class TextEditor extends React.Component {
       style.background = 'transparent';
       style.zIndex = '1000';
       style.outline = 'none';
-      style.whiteSpace = this.props.width === 'auto' ? 'nobreak' : 'pre-wrap';
+      style.whiteSpace = this.props.width === 'auto' && !this.props.maxWidth ? 'nowrap' : 'pre-wrap';
       style.border = 'none';
       style.wordBreak = 'break-word';
       style.wordWrap = 'break-word'; // for FF
@@ -92,7 +92,7 @@ export default class TextEditor extends React.Component {
       this._target.onchange = this.triggerChange;
 
       this._target.onblur = () => {
-        this.props.onBlur && this.props.onBlur();
+        // this.props.onBlur && this.props.onBlur();
       };
 
       this.context.canvas.wrapperNode.appendChild(this._target);
@@ -101,7 +101,7 @@ export default class TextEditor extends React.Component {
     const target = this._target;
     wrapProperties.forEach((key) => {
       if (this.props[key] && key !== 'text') {
-        if (/width|height|fontSize/.test(key) && typeof this.props[key] === 'number') {
+        if (/maxWidth|width|height|fontSize/.test(key) && typeof this.props[key] === 'number') {
           target.style[key] = `${this.props[key]}px`;
         } else {
           target.style[key] = `${this.props[key]}`;

@@ -4,15 +4,34 @@ import './css/font-awesome.css';
 import Milestone from './elements/Milestone';
 import Timeline from './elements/Timeline';
 
-const api = Api.create([
+const api = Api.create({}, [
   {type: 'text', fontFamily: 'Arial', fontSize: 16, x: 20, y: 30, text: 'Should break between words', width: 70},
-  {type: 'text', fontFamily: 'Verdana', fontSize: 6, x: 20, y: 10, text: 'Should break', width: 30},
+  {type: 'text', fontFamily: 'Verdana', fontSize: 20, x: 20, y: 10, text: 'Should break', textAnchor: 'middle'},
   {type: 'text', fontFamily: 'Arial', lineHeight: 3, x: 140, y: 20, text: 'Should swallow            spaces at the end', width: 110},
   {type: 'text', fontFamily: 'Times', rotate: 30, x: 140, fontSize: 17, y: 0, lineHeight: 2.0, text: 'Should use_the            spaces as empty line', width: 53},
   {type: 'text', fontFamily: 'Arial', fontSize: 17, x: 260, y: 20, text: 'Should\n      break at NL and show spaces', width: 120},
   {type: 'text', fontFamily: 'Verdana', fontSize: 6, x: 400, y: 20, text: '\n\n     \n     \n empty spaces with auto break', width: 120},
   {type: 'text', fontFamily: 'Times New Roman', rotate: 20, x: 520, y: 20, text: 'Should\n\nbe just one empty line', width: 110},
   {type: 'text', fontFamily: 'Verdana', width: 200, x: 700, y: 20, text: 'asdasdasdasd\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nempty spaces with auto break empty spaces with auto break'},
+  // {type: 'text', fontFamily: 'Verdana', fontSize: 20, x: 300, y: 0, text: 'Should break like this', textAnchor: 'start'},
+  // {type: 'text', fontFamily: 'Verdana', fontSize: 20, x: 300, y: 50, text: 'Should break like this', textAnchor: 'middle'},
+  // {type: 'text', fontFamily: 'Verdana', fontSize: 20, x: 300, y: 100, text: 'Should break like this', textAnchor: 'end'},
+  // {type: 'text', fontFamily: 'Verdana', fontSize: 20, x: 200, y: 200, width: 200, text: 'Should break like this', textAnchor: 'start'},
+  // {type: 'text', fontFamily: 'Verdana', fontSize: 20, x: 200, y: 270, width: 200, text: 'Should break like this', textAnchor: 'middle'},
+  // {type: 'text', fontFamily: 'Verdana', fontSize: 20, x: 200, y: 340, width: 200, text: 'Should break like this', textAnchor: 'end'},
+  // {type: 'text', fontFamily: 'Verdana', fontSize: 20, x: 200, y: 470, width: 200, text: 'Should break like this', verticalAlign: 'top', textAnchor: 'end'},
+  // {type: 'text', fontFamily: 'Verdana', fontSize: 20, x: 400, y: 470, width: 200, text: 'Should break like this', verticalAlign: 'middle', textAnchor: 'middle'},
+  // {type: 'text', fontFamily: 'Verdana', fontSize: 20, x: 600, y: 470, width: 200, text: 'Should break like this', verticalAlign: 'bottom'},
+
+  // {type: 'text', fontFamily: 'Verdana', fontSize: 20, x: 200, y: 600, height: 200, text: 'Should break like this', verticalAlign: 'top', textAnchor: 'end'},
+  // {type: 'text', fontFamily: 'Verdana', fontSize: 20, x: 400, y: 600, height: 200, text: 'Should break like this', verticalAlign: 'middle', textAnchor: 'middle'},
+  // {type: 'text', fontFamily: 'Verdana', fontSize: 20, x: 600, y: 600, height: 200, text: 'Should break like this', verticalAlign: 'bottom'},
+
+
+  // {type: 'text', fontFamily: 'Verdana', fontSize: 20, x: 300, y: 0, text: 'Should break like this', textAnchor: 'start'},
+  // {type: 'text', fontFamily: 'Verdana', fontSize: 20, x: 300, y: 50, text: 'Should break like this', textAnchor: 'middle'},
+  // {type: 'text', fontFamily: 'Verdana', fontSize: 20, x: 300, y: 100, text: 'Should break like this', textAnchor: 'end'},
+
   // {
   //   factory: Text, fontFamily: 'Verdana', fontSize: 30, x: 238, y: 100, text: 'Timeline example', width: 400, textAlign: 'center'
   // },

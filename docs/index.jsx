@@ -21,21 +21,12 @@ const pages = [
   {
     path: '/demo',
     title: 'Demo',
-    component: require('../examples/Examples')
+    component: require('./examples/Examples')
   },
   {
     title: 'Components',
     path: '/components',
-    pages: [
-      {
-        path: '/components/element',
-        title: 'Element'
-      },
-      {
-        path: '/components/text',
-        title: 'Text'
-      }
-    ]
+    component: require('./components/Index')
   }
 ];
 

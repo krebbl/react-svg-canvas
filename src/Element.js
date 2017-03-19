@@ -10,6 +10,7 @@ export default class Element extends React.Component {
   state = {
     bboxX: 0,
     bboxY: 0,
+
     moving: false,
     highlight: false
   };
@@ -20,6 +21,8 @@ export default class Element extends React.Component {
     _id: PropTypes.string,
     x: PropTypes.number,
     y: PropTypes.number,
+    anchorX: PropTypes.number,
+    anchorY: PropTypes.number,
     width: PropTypes.number,
     height: PropTypes.number,
     rotate: PropTypes.number,
@@ -37,6 +40,8 @@ export default class Element extends React.Component {
   static defaultProps = {
     x: 0,
     y: 0,
+    anchorX: 0,
+    anchorY: 0,
     rotate: 0,
     selectable: true,
     scalable: true,
@@ -104,20 +109,19 @@ export default class Element extends React.Component {
     this.context.api.dataChanged();
   }
 
-  handleKnobDone = () => {
-    this.context.api.saveInHistory();
-  };
-
   renderKnobs() {
     const knobs = [];
     if (this.props.scalable) {
       if (this.props.width != null) {
-        knobs.push(<ScaleKnob key="l" dir="l" y={this.actualHeight() * 0.5} onChange={this.handleKnobChange} onDone={this.handleKnobDone}/>);
-        knobs.push(<ScaleKnob key="r" dir="r" x={this.actualWidth()} y={this.actualHeight() * 0.5} onChange={this.handleKnobChange} onDone={this.handleKnobDone}/>);
+        knobs.push(<ScaleKnob
+          key="l" dir="l"
+          y={this.actualHeight() * 0.5}
+          onChange={this.handleKnobChange} />);
+        knobs.push(<ScaleKnob key="r" dir="r" x={this.actualWidth()} y={this.actualHeight() * 0.5} onChange={this.handleKnobChange}/>);
       }
       if (this.props.height != null) {
-        knobs.push(<ScaleKnob key="t" dir="t" x={this.actualWidth() * 0.5} onChange={this.handleKnobChange} onDone={this.handleKnobDone}/>);
-        knobs.push(<ScaleKnob key="b" dir="b" x={this.actualWidth() * 0.5} y={this.actualHeight()} onChange={this.handleKnobChange} onDone={this.handleKnobDone}/>);
+        knobs.push(<ScaleKnob key="t" dir="t" x={this.actualWidth() * 0.5} onChange={this.handleKnobChange} />);
+        knobs.push(<ScaleKnob key="b" dir="b" x={this.actualWidth() * 0.5} y={this.actualHeight()} onChange={this.handleKnobChange} />);
       }
     }
     // if (this.props.rotatable) {
@@ -226,9 +230,9 @@ export default class Element extends React.Component {
     return node.getBBox();
   }
 
-  calcTransform(x, y, width, height, rotate) {
+  calcTransform(x, y, width, height, anchorX, anchorY, rotate) {
     let transform = '';
-    transform += `translate(${x}, ${y})`;
+    transform += `translate(${x - (anchorX * width)}, ${y - (anchorY * height)})`;
     if (this.props.rotate && height != null && width != null) {
       transform += ` rotate(${rotate}, ${width * 0.5}, ${height * 0.5})`;
     }
@@ -240,8 +244,8 @@ export default class Element extends React.Component {
   }
 
   calcNewPositionForSize(newWidth, newHeight, anchorX, anchorY) {
-    const width = this.actualWidth();
-    const height = this.actualHeight();
+    const width = this.props.width || 0;
+    const height = this.props.height || 0;
     const p = {x: this.props.x, y: this.props.y};
     const c = {x: width * 0.5, y: height * 0.5};
     const cn = {x: newWidth * 0.5, y: newHeight * 0.5};
@@ -265,6 +269,21 @@ export default class Element extends React.Component {
     };
   }
 
+  processRotate(rotate) {
+    let center = this.svgRoot().createSVGPoint();
+    center.x = this.state.bboxX + (this.state.width * 0.5);
+    center.y = this.state.bboxY + (this.state.height * 0.5);
+    const transform = this.svgRoot().createSVGTransform();
+    transform.setRotate(rotate, 0, 0);
+    const rotatedCenter = center.matrixTransform(transform.matrix);
+    const transform2 = this.svgRoot().createSVGTransform();
+    transform2.setRotate(this.props.rotate, 0, 0);
+    const oldRotatedCenter = center.matrixTransform(transform2.matrix);
+    this.processChange('x', this.props.x + (oldRotatedCenter.x - rotatedCenter.x), false);
+    this.processChange('y', this.props.y + (oldRotatedCenter.y - rotatedCenter.y), false);
+    this.processChange('rotate', rotate);
+  }
+
   processKnobChange(knob, dir, diffVector) {
     let np;
     let newHeight;
@@ -272,28 +291,28 @@ export default class Element extends React.Component {
     switch (dir) {
       case 'b':
         newHeight = this.props.height + diffVector.y;
-        np = this.calcNewPositionForSize(this.actualWidth(), newHeight, -1, -1);
+        np = this.calcNewPositionForSize(this.props.width || 0, newHeight, -1, -1);
         this.processChange('x', np.x, false);
         this.processChange('y', np.y, false);
         this.processChange('height', newHeight, true);
         break;
       case 't':
         newHeight = this.props.height - diffVector.y;
-        np = this.calcNewPositionForSize(this.actualWidth(), newHeight, -1, 1);
+        np = this.calcNewPositionForSize(this.props.width || 0, newHeight, -1, 1);
         this.processChange('x', np.x, false);
         this.processChange('y', np.y, false);
         this.processChange('height', newHeight, true);
         break;
       case 'l':
         newWidth = this.props.width - diffVector.x;
-        np = this.calcNewPositionForSize(newWidth, this.actualHeight(), 1, 1);
+        np = this.calcNewPositionForSize(newWidth, this.props.height || 0, 1, 1);
         this.processChange('x', np.x, false);
         this.processChange('y', np.y, false);
         this.processChange('width', newWidth, true);
         break;
       case 'r':
         newWidth = this.props.width + diffVector.x;
-        np = this.calcNewPositionForSize(newWidth, this.actualHeight(), -1, -1);
+        np = this.calcNewPositionForSize(newWidth, this.props.height || 0, -1, -1);
         this.processChange('x', np.x, false);
         this.processChange('y', np.y, false);
         this.processChange('width', newWidth, true);
@@ -374,6 +393,9 @@ export default class Element extends React.Component {
   onDrag = (e) => {
     if (this.movePoint) {
       e.stopPropagation();
+      if (!this.moved) {
+        this.context.api.startChange();
+      }
       if (!this.state.selected) {
         this.context.api.selectElement(this.id);
       }
@@ -396,7 +418,7 @@ export default class Element extends React.Component {
       this.moved = p.x !== this.startPoint.x || p.y !== this.startPoint.y;
       let newX = this.startX + (p.x - this.startPoint.x);
       let newY = this.startY + (p.y - this.startPoint.y);
-      const diffs = this.context.canvas.findSnaplines(this, this.createSnaplines(newX + (this.state.bboxX || 0), newY + (this.state.bboxY || 0), this.actualWidth(), this.actualHeight()));
+      const diffs = this.context.canvas.findSnaplines(this, this.createSnaplines(newX + (this.state.bboxX || 0), newY + (this.state.bboxY || 0), this.actualWidth(), this.actualHeight(), this.props.rotate));
       if (diffs.x || diffs.y) {
         const inverseMatrix = this.context.canvas.slideNode.getCTM();
         const parentCtm = this.node.parentNode.getCTM().inverse();
@@ -423,8 +445,9 @@ export default class Element extends React.Component {
     window.removeEventListener('touchmove', this.onDrag);
     window.removeEventListener('mouseup', this.onDragEnd);
     window.removeEventListener('touchend', this.onDragEnd);
+
     if (this.moved) {
-      this.context.api.saveInHistory();
+      this.context.api.finishChange();
       this.context.canvas.clearSnaplines();
     }
   };
@@ -553,8 +576,10 @@ export default class Element extends React.Component {
   render() {
     const {selectable} = this.props;
     const transform = this.calcTransform(this.props.x, this.props.y,
-      this.actualWidth(),
-      this.actualHeight(),
+      (this.props.width || 0),
+      (this.props.height || 0),
+      this.state.anchorX || this.props.anchorX || 0,
+      this.state.anchorY || this.props.anchorY || 0,
       this.props.rotate);
     return (
       <g

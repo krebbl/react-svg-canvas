@@ -1,6 +1,7 @@
 import Immutable from 'seamless-immutable';
 import EventDispatcher from 'eventdispatcher';
 import Text from './Text';
+import deepEqual from 'deep-equal';
 
 function generateUIDNotMoreThan1million() {
   return ('0000' + (Math.random() * Math.pow(36, 6) << 0).toString(36)).slice(-6);
@@ -43,18 +44,18 @@ export default class Api extends EventDispatcher {
     this.assets = Immutable({});
     this.clipboard = [];
     this.pathCache = {};
-    this.historyPointer = 0;
+    this.historyPointer = -1;
   }
 
-  static create(apiTree, selectedElements) {
+  static create(slideOptions, elements, selectedElements) {
     const api = new Api();
-    apiTree.forEach((element, i) => {
+    elements.forEach((element, i) => {
       api.addElement(element, i);
     });
     (selectedElements || []).forEach((id) => {
       api.selections = api.selections.set(id, true);
     });
-    api.saveInHistory();
+    api.slide = api.slide.merge(slideOptions);
     window.api = api;
     return api;
   }
@@ -170,16 +171,18 @@ export default class Api extends EventDispatcher {
     const otherElement = getInPath(this.slide.elements, path.concat([toIdx]));
     const element = getInPath(this.slide.elements, path.concat([fromIdx]));
     if (otherElement && element) {
+      this.startChange();
       this.slide = this.slide.setIn(['elements'].concat(path.concat([fromIdx])), otherElement).setIn(['elements'].concat(path.concat([toIdx])), element);
       this.pathCache = {};
-      this.saveInHistory();
+      this.finishChange();
       this.dataChanged();
     }
   }
 
-  saveInHistory() {
-    this.history = Immutable(this.history.slice(0, this.historyPointer + 1).concat([{cache: this.elements, slide: this.slide}]));
-    this.historyPointer = this.history.length - 1;
+  saveInHistory(state) {
+    this.currentState = {cache: this.elements, slide: this.slide, selection: this.selection};
+    this.history = Immutable(this.history.slice(0, this.historyPointer + 1).concat([state]));
+    this.historyPointer = this.history.length;
     this.historyChanged();
   }
 
@@ -189,6 +192,7 @@ export default class Api extends EventDispatcher {
       const entry = this.history[this.historyPointer];
       this.slide = entry.slide;
       this.elements = entry.cache;
+      this.selection = entry.selection;
       this.pathCache = {};
       this.dataChanged();
       this.selectionChanged();
@@ -196,11 +200,19 @@ export default class Api extends EventDispatcher {
   }
 
   redo() {
+    let entry;
     if (this.historyPointer < this.history.length - 1) {
       this.historyPointer += 1;
-      const entry = this.history[this.historyPointer];
+      entry = this.history[this.historyPointer];
+    } else {
+      this.historyPointer = this.history.length;
+      entry = this.currentState;
+    }
+
+    if (entry) {
       this.slide = entry.slide;
       this.elements = entry.cache;
+      this.selection = entry.selection;
       this.pathCache = {};
       this.dataChanged();
       this.selectionChanged();
@@ -255,6 +267,7 @@ export default class Api extends EventDispatcher {
 
     this.slide = this.slide.setIn(['elements'].concat(p), parent);
     this.elements = this.elements.without(id);
+    this.selection = this.selection.without(id);
     // clear path cache
     this.pathCache = {};
   }
@@ -285,6 +298,21 @@ export default class Api extends EventDispatcher {
       // }
     } catch (e) {
       console.warn(e);
+    }
+  }
+
+  startChange() {
+    this._currentState = {cache: this.elements, slide: this.slide, selection: this.selection};
+  }
+
+  finishChange() {
+    if (this._currentState) {
+      if (!deepEqual(this._currentState.slide, this.slide)) {
+        this.saveInHistory(this._currentState);
+      } else {
+        console.log("nothing changed!");
+      }
+      this._currentState = null;
     }
   }
 
@@ -333,14 +361,15 @@ export default class Api extends EventDispatcher {
   }
 
   removeSelectedElements() {
+    this.startChange();
     const ids = Object.keys(this.selection);
     ids.forEach((id) => {
       this.removeElement(id);
     });
+    this.finishChange();
 
-    if (ids.length > 0) {
-      this.saveInHistory();
-    }
+    this.selectionChanged();
+    this.dataChanged();
   }
 
   getValue(id, key) {
@@ -410,7 +439,7 @@ export default class Api extends EventDispatcher {
   getNode(id) {
     return this.nodes[id];
   }
-  
+
   isElementSelected(id) {
     return !!this.selection[id];
   }

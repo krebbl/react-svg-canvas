@@ -1,4 +1,5 @@
 import React, {PropTypes} from 'react';
+import EventListener from 'react-event-listener';
 import Api from './Api';
 
 const wrapperStyle = {width: '100%', height: '100%', overflow: 'auto', position: 'absolute'};
@@ -184,6 +185,14 @@ export default class Canvas extends React.Component {
     this.possibleSnaplines = possibleSnaplines;
   }
 
+  handleResize = () => {
+    this._resizeTimeout && clearTimeout(this._resizeTimeout);
+
+    this._resizeTimeout = setTimeout(() => {
+      this.positionSlide();
+    }, 100);
+  };
+
   handleKeyDown = (e) => {
     const api = this.props.api;
     if (e.srcElement === document.body) {
@@ -259,6 +268,7 @@ export default class Canvas extends React.Component {
     }
 
     return (<div style={wrapperStyle} ref={this.handleWrapperRef}>
+      <EventListener target="window" onResize={this.handleResize} />
       <svg
         xmlns="http://www.w3.org/2000/svg" version="1.1"
         width={this.state.width || '100%'} height={this.state.height || '100%'}
@@ -287,9 +297,9 @@ export default class Canvas extends React.Component {
             <g className="snaplines">
               {(this.state.snaplines || []).map((snapline, i) => {
                 if (snapline.mode === 'x') {
-                  return <line key={i} vectorEffect="non-scaling-stroke" strokeDasharray="5 5" stroke="blue" strokeWidth="0.1" y1={0} y2={this.state.slide.height} x1={snapline.pos} x2={snapline.pos}/>
+                  return <line key={i} vectorEffect="non-scaling-stroke" strokeDasharray="5 5" stroke="blue" strokeWidth="0.8" y1={0} y2={this.state.slide.height} x1={snapline.pos} x2={snapline.pos}/>
                 } else {
-                  return <line key={i} vectorEffect="non-scaling-stroke" strokeDasharray="5 5" stroke="blue" strokeWidth="0.1" x1={0} x2={this.state.slide.width} y1={snapline.pos} y2={snapline.pos}/>
+                  return <line key={i} vectorEffect="non-scaling-stroke" strokeDasharray="5 5" stroke="blue" strokeWidth="0.8" x1={0} x2={this.state.slide.width} y1={snapline.pos} y2={snapline.pos}/>
                 }
               })}
             </g>

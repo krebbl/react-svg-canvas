@@ -46,7 +46,7 @@ export default class Selection extends React.Component {
           {...rectProps}
           fill="transparent"
           vectorEffect="non-scaling-stroke"
-          stroke="gray" strokeWidth="0.5"
+          stroke="#3a7ed2" strokeWidth="1"
           strokeOpacity="0.5"
         />
       </g>

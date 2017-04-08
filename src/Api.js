@@ -80,7 +80,7 @@ export default class Api extends EventDispatcher {
       _key = kCopy.pop();
     }
     const newElement = Object.assign({}, props, {
-      _id: props._id && !generateNewId ? props._id : generateUIDNotMoreThan1million(),
+      id: props.id && !generateNewId ? props.id : generateUIDNotMoreThan1million(),
       _key,
       _parentId: targetId
     });
@@ -95,7 +95,7 @@ export default class Api extends EventDispatcher {
             key: [pKey, i]
           });
         });
-      } else if (typeof (prop) === 'object') {
+      } else if (prop != null && typeof (prop) === 'object') {
         elementsToAdd.push({
           props: prop,
           key: [pKey]
@@ -106,10 +106,10 @@ export default class Api extends EventDispatcher {
 
     const targetPath = path.concat(k);
     this.slide = this.slide.setIn(['elements'].concat(targetPath), newElement);
-    this.elements = this.elements.set(newElement._id, getInPath(this.slide.elements, targetPath));
+    this.elements = this.elements.set(newElement.id, getInPath(this.slide.elements, targetPath));
     this.pathCache = {};
     elementsToAdd.forEach((el) => {
-      this.addElement(el.props, el.key, newElement._id, generateNewId);
+      this.addElement(el.props, el.key, newElement.id, generateNewId);
     });
     return newElement;
   }
@@ -171,11 +171,8 @@ export default class Api extends EventDispatcher {
     const otherElement = getInPath(this.slide.elements, path.concat([toIdx]));
     const element = getInPath(this.slide.elements, path.concat([fromIdx]));
     if (otherElement && element) {
-      this.startChange();
       this.slide = this.slide.setIn(['elements'].concat(path.concat([fromIdx])), otherElement).setIn(['elements'].concat(path.concat([toIdx])), element);
       this.pathCache = {};
-      this.finishChange();
-      this.dataChanged();
     }
   }
 
@@ -219,6 +216,14 @@ export default class Api extends EventDispatcher {
     }
   }
 
+  hasUndo() {
+    return this.historyPointer > 0;
+  }
+
+  hasRedo() {
+    return this.historyPointer > -1 && this.historyPointer < this.history.length;
+  }
+
   updateSlide(key, value) {
     const k = keyToArray(key);
     this.slide = this.slide.setIn(k, value);
@@ -229,7 +234,7 @@ export default class Api extends EventDispatcher {
     let children = [];
     Object.keys(element).forEach((key) => {
       if (typeof (element[key]) === 'object') {
-        if (element[key]._id) {
+        if (element[key].id) {
           children.push(element[key]);
         }
       }
@@ -237,7 +242,7 @@ export default class Api extends EventDispatcher {
 
     if (deep) {
       children.forEach((child) => {
-        children = children.concat(this.getChildren(child._id, true));
+        children = children.concat(this.getChildren(child.id, true));
       });
     }
 
@@ -255,14 +260,14 @@ export default class Api extends EventDispatcher {
 
     let parent = getInPath(this.slide.elements, p);
     if (typeof (deleteKey) === 'number') {
-      parent = parent.filter(el => el._id !== id);
+      parent = parent.filter(el => el.id !== id);
     } else {
       parent = parent.without(deleteKey);
     }
 
     // TODO remove children
     this.getChildren(id).forEach((child) => {
-      this.removeElement(child._id);
+      this.removeElement(child.id);
     });
 
     this.slide = this.slide.setIn(['elements'].concat(p), parent);
@@ -283,21 +288,17 @@ export default class Api extends EventDispatcher {
 
   processChange(id, key, value) {
     const node = this.getNode(id);
-    if (!node) {
-      return;
-    }
-    const checkType = node.constructor.propTypes[key];
-    const props = {};
-    props[key] = value;
-    try {
-      // const error = checkType(props, key, node.constructor.name, 'prop', key, 'SECRET_DO_NOT_PASS_THIS_OR_YOU_WILL_BE_FIRED');
-      // if (error) {
-      //   console.warn(error);
-      // } else {
-      node.processChange(key, value);
-      // }
-    } catch (e) {
-      console.warn(e);
+    if (node) {
+      try {
+        node.processChange(key, value);
+      } catch (e) {
+        console.warn(e);
+      }
+    } else {
+      // TODO: think about this
+      // if there is no node, that can handle the change, just update the element
+      this.updateElement(id, key, value);
+      this.dataChanged();
     }
   }
 
@@ -309,8 +310,8 @@ export default class Api extends EventDispatcher {
     if (this._currentState) {
       if (!deepEqual(this._currentState.slide, this.slide)) {
         this.saveInHistory(this._currentState);
-      } else {
-        console.log("nothing changed!");
+        this.dataChanged();
+        this.selectionChanged();
       }
       this._currentState = null;
     }
@@ -330,9 +331,9 @@ export default class Api extends EventDispatcher {
     } else {
       key = [parent.length];
     }
-    const mutable = element.without('_id').asMutable({deep: true});
+    const mutable = element.without('id').asMutable({deep: true});
 
-    return this.addElement(mutable, key, parent._id, true);
+    return this.addElement(mutable, key, parent.id, true);
   }
 
   // copySelectedElements() {
@@ -347,6 +348,7 @@ export default class Api extends EventDispatcher {
   // }
 
   cloneSelectedElements() {
+    this.startChange();
     // find selection with shortest path
     let shortestPathLength = Infinity;
     let upperElementId = null;
@@ -358,6 +360,8 @@ export default class Api extends EventDispatcher {
       }
     });
     this.cloneElement(upperElementId);
+    this.selectElement(upperElementId);
+    this.finishChange();
   }
 
   removeSelectedElements() {
@@ -389,6 +393,10 @@ export default class Api extends EventDispatcher {
     return ret === this.slide.elements ? null : ret;
   }
 
+  findElement(fnc) {
+    return Object.keys(this.elements).map(id => this.elements[id]).find(fnc);
+  }
+
   getDataPath(id) {
     if (this.pathCache[id]) {
       return this.pathCache[id];
@@ -398,7 +406,7 @@ export default class Api extends EventDispatcher {
       return null;
     }
     if (!element._parentId) {
-      return [this.slide.elements.findIndex(el => el._id === id)];
+      return [this.slide.elements.findIndex(el => el.id === id)];
     }
     const parentPath = this.getDataPath(element._parentId);
     if (!parentPath) {
@@ -407,7 +415,7 @@ export default class Api extends EventDispatcher {
     const parent = getInPath(this.slide.elements, parentPath);
     let ret = null;
     if (parent[element._key] instanceof Array) {
-      ret = parentPath.concat([element._key, parent[element._key].findIndex(el => el._id === id)]);
+      ret = parentPath.concat([element._key, parent[element._key].findIndex(el => el.id === id)]);
     } else {
       ret = parentPath.concat([element._key]);
     }
@@ -431,8 +439,8 @@ export default class Api extends EventDispatcher {
   }
 
   registerNode(node) {
-    if (node.id) {
-      this.nodes[node.id] = node;
+    if (node.props.id) {
+      this.nodes[node.props.id] = node;
     }
   }
 
@@ -445,21 +453,21 @@ export default class Api extends EventDispatcher {
   }
 
   unregisterNode(node) {
-    if (node.id) {
-      delete this.nodes[node.id];
+    if (node.props.id) {
+      delete this.nodes[node.props.id];
     }
   }
 
   updateSelection(node) {
     if (this.isNodeSelected(node)) {
-      this.selection = this.selection.set(node.id, true);
-      this.nodes[node.id] = node;
+      this.selection = this.selection.set(node.props.id, true);
+      this.nodes[node.props.id] = node;
       this.selectionChanged();
     }
   }
 
   isNodeSelected(node) {
-    return this.selection[node.id];
+    return this.selection[node.props.id];
   }
 
   getSelectedElements() {

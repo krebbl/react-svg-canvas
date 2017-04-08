@@ -2,20 +2,7 @@ import React, {PropTypes} from 'react';
 import bowser from 'bowser';
 import EventListener, {withOptions} from 'react-event-listener';
 
-const wrapProperties = ['text', 'fontSize', 'fontFamily', 'verticalAlign', 'lineHeight', 'textAlign', 'width'];
-
-function setInnerText(target, text) {
-  if (text !== target.textContent) {
-    target.innerHTML = `<span>${text.replace(/\r?\n/gi, '<br/>')}</span>`;
-  }
-}
-
-function getInnerText(target) {
-  if (!target) {
-    return '';
-  }
-  return target.innerText.replace(/^\n$/, "");
-}
+const wrapProperties = ['text', 'fontFamily', 'verticalAlign', 'lineHeight', 'textAlign', 'width'];
 
 export default class TextEditor extends React.Component {
 
@@ -75,8 +62,9 @@ export default class TextEditor extends React.Component {
       style.background = 'transparent';
       style.zIndex = '1000';
       style.outline = 'none';
-      style.whiteSpace = this.props.width === 'auto' && !this.props.maxWidth ? 'nowrap' : 'pre-wrap';
+      style.whiteSpace = !this.props.width && !this.props.maxWidth ? 'nowrap' : 'pre-wrap';
       style.border = 'none';
+      style.fontSize = `${this.props.fontSize}px`;
       style.wordBreak = 'break-word';
       style.wordWrap = 'break-word'; // for FF
       style.padding = '0';
@@ -85,37 +73,88 @@ export default class TextEditor extends React.Component {
       style.color = this.props.fill;
       this._target.setAttribute('contenteditable', 'true');
 
-      this._target.oninput = this.triggerChange;
-
-      this._target.onpaste = this.triggerChange;
-
-      this._target.onchange = this.triggerChange;
-
-      this._target.onblur = () => {
-        // this.props.onBlur && this.props.onBlur();
-      };
-
       this.context.canvas.wrapperNode.appendChild(this._target);
     }
 
     const target = this._target;
-    wrapProperties.forEach((key) => {
-      if (this.props[key] && key !== 'text') {
-        if (/maxWidth|width|height|fontSize/.test(key) && typeof this.props[key] === 'number') {
-          target.style[key] = `${this.props[key]}px`;
-        } else {
-          target.style[key] = `${this.props[key]}`;
-        }
+
+    this.applyEventListeners(target);
+    this.applyWrapProperties(target);
+    this.setInnerText(target, this.props.text);
+    this.positionEditable(target);
+    this.focusEditable(target);
+  }
+
+  setInnerText (editable, text) {
+    if (text !== editable.textContent) {
+      editable.innerHTML = `<span>${text.replace(/\n$/, '\n\n').replace(/\r?\n/gi, '<br/>')}</span>`;
+    }
+  }
+
+  getInnerText (editable) {
+    if (!editable) {
+      return '';
+    }
+    let innerText = editable.innerText.replace(/^\n$/, '');
+    if (bowser.msie || bowser.msedge) {
+      if (editable.lastChild && editable.lastChild.lastChild && editable.lastChild.lastChild.tagName === 'BR') {
+        innerText += '\n';
       }
-    });
+    } else {
+      innerText = innerText.replace(/\n$/, '');
+    }
+    return innerText;
+  }
 
-    setInnerText(target, this.props.text);
+  focusEditable(target) {
+    target.focus();
 
-    if (bowser.msie) {
-      this._textBeforeForIE = target.innerHTML;
-      const checkForChange = () => {
-        if (target.innerHTML !== this._textBeforeForIE) {
-          this._textBeforeForIE = target.innerHTML;
+    if (document.createRange && target.lastChild) {
+      const range = document.createRange();
+      range.selectNode(target.lastChild.lastChild || target.lastChild);
+      range.collapse(false);
+      window.getSelection().removeAllRanges();
+      window.getSelection().addRange(range);
+    }
+  }
+
+  applyEventListeners(editable) {
+    editable.oninput = this.triggerChange;
+
+    editable.onpaste = (e) => {
+      let content;
+      e.preventDefault();
+
+      if (e.clipboardData) {
+        content = (e.originalEvent || e).clipboardData.getData('text/plain');
+        if (this.props.singleLine) {
+          content = content.replace(/\n/, ' ');
+        }
+        document.execCommand('insertText', false, content);
+      }
+      else if (window.clipboardData) {
+        content = window.clipboardData.getData('Text');
+
+        document.selection.createRange().pasteHTML(content);
+      }
+      setTimeout(() => {
+        this.triggerChange();
+      }, 1);
+
+      return false;
+    };
+
+    editable.onchange = this.triggerChange;
+
+    editable.onblur = () => {
+      this.props.onBlur && this.props.onBlur();
+    };
+
+    if (bowser.msie || bowser.msedge) {
+      this._textBeforeForIE = editable.innerHTML;
+      const checkForChange = (e) => {
+        if (editable.innerHTML !== this._textBeforeForIE) {
+          this._textBeforeForIE = editable.innerHTML;
           this.triggerChange();
         }
       };
@@ -130,12 +169,17 @@ export default class TextEditor extends React.Component {
         this._checking = false;
       };
 
-      target.onkeyup = () => {
+      editable.onkeyup = (e) => {
         stopChecking();
       };
-      target.onkeydown = (e) => {
+      editable.onkeydown = (e) => {
+        if (e.which === 27) {
+          e.target.blur();
+          e.stopPropagation();
+        }
         if (e.which === 13 && !e.shiftKey) {
           e.preventDefault();
+
           e.stopPropagation();
 
           const selection = window.getSelection();
@@ -143,21 +187,43 @@ export default class TextEditor extends React.Component {
           const br = document.createElement('br');
 
           range.deleteContents();
+
           range.insertNode(br);
+
           range.setStartAfter(br);
+
           range.setEndAfter(br);
+
           range.collapse(false);
+
           selection.removeAllRanges();
+
           selection.addRange(range);
         }
         setTimeout(() => {
           startChecking();
         }, 5);
-      };
+      }
+    } else {
+      editable.onkeydown = (e) => {
+        if (e.which === 27) {
+          e.target.blur();
+          e.stopPropagation();
+        }
+      }
     }
+  }
 
-    this.positionEditable(target);
-    target.focus();
+  applyWrapProperties(editable) {
+    wrapProperties.forEach((key) => {
+      if (this.props[key] && key !== 'text') {
+        if (/maxWidth|width|height/.test(key) && typeof this.props[key] === 'number') {
+          editable.style[key] = `${this.props[key] / this.props.scaleFactor}px`;
+        } else {
+          editable.style[key] = `${this.props[key]}`;
+        }
+      }
+    });
   }
 
   componentWillUnmount() {
@@ -169,7 +235,8 @@ export default class TextEditor extends React.Component {
     if (!target) {
       return;
     }
-    this.props.onTextChange && this.props.onTextChange(getInnerText(target));
+
+    this.props.onTextChange && this.props.onTextChange(this.getInnerText(target));
   };
 
   removeEditable() {
@@ -190,7 +257,7 @@ export default class TextEditor extends React.Component {
   positionEditable(editable) {
     if (editable) {
       const val = this.node.getCTM();
-      editable.style.transform = `matrix(${[val.a, val.b, val.c, val.d, val.e, val.f].join(',')})`;
+      editable.style.transform = `matrix(${[val.a, val.b, val.c, val.d, val.e, val.f].join(',')}) scale(${this.props.scaleFactor})`;
     }
   }
 

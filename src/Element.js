@@ -1,5 +1,4 @@
 import React, {PropTypes} from 'react';
-import objectDiff from 'object-diff';
 import shallowequal from 'shallowequal';
 import Api from './Api';
 import Selection from './Selection';
@@ -18,7 +17,7 @@ export default class Element extends React.Component {
   isGroup = false;
 
   static propTypes = {
-    _id: PropTypes.string,
+    id: PropTypes.string,
     x: PropTypes.number,
     y: PropTypes.number,
     anchorX: PropTypes.number,
@@ -76,7 +75,6 @@ export default class Element extends React.Component {
   constructor(props, context) {
     super(props, context);
     this.firstRender = true;
-    this.id = props._id;
     if (!context.api) {
       throw new Error('Api missing on context');
     }
@@ -87,13 +85,13 @@ export default class Element extends React.Component {
     context.api.on('selectionChanged', this.handleSelectionChange);
 
     this.state = {
-      selected: !!context.api.isElementSelected(this.id)
+      selected: !!context.api.isElementSelected(props.id)
     };
   }
 
   handleSelectionChange = () => {
     this.setState({
-      selected: this.context.api.isElementSelected(this.id)
+      selected: this.context.api.isElementSelected(this.props.id)
     });
   };
 
@@ -102,7 +100,7 @@ export default class Element extends React.Component {
   }
 
   updateProp(key, value) {
-    this.context.api.updateElement(this.id, key, value);
+    this.context.api.updateElement(this.props.id, key, value);
   }
 
   dataChanged() {
@@ -116,17 +114,14 @@ export default class Element extends React.Component {
         knobs.push(<ScaleKnob
           key="l" dir="l"
           y={this.actualHeight() * 0.5}
-          onChange={this.handleKnobChange} />);
+          onChange={this.handleKnobChange}/>);
         knobs.push(<ScaleKnob key="r" dir="r" x={this.actualWidth()} y={this.actualHeight() * 0.5} onChange={this.handleKnobChange}/>);
       }
       if (this.props.height != null) {
-        knobs.push(<ScaleKnob key="t" dir="t" x={this.actualWidth() * 0.5} onChange={this.handleKnobChange} />);
-        knobs.push(<ScaleKnob key="b" dir="b" x={this.actualWidth() * 0.5} y={this.actualHeight()} onChange={this.handleKnobChange} />);
+        knobs.push(<ScaleKnob key="t" dir="t" x={this.actualWidth() * 0.5} onChange={this.handleKnobChange}/>);
+        knobs.push(<ScaleKnob key="b" dir="b" x={this.actualWidth() * 0.5} y={this.actualHeight()} onChange={this.handleKnobChange}/>);
       }
     }
-    // if (this.props.rotatable) {
-    //
-    // }
     return knobs;
   }
 
@@ -135,11 +130,11 @@ export default class Element extends React.Component {
   };
 
   actualWidth() {
-    return this.props.width || this.state.width || 0;
+    return this.props.width || this.state.bboxWidth || 0;
   }
 
   actualHeight() {
-    return this.props.height || this.state.height || 0;
+    return this.props.height || this.state.bboxHeight || 0;
   }
 
   renderSelection() {
@@ -154,14 +149,14 @@ export default class Element extends React.Component {
     const props = {
       x: this.state.bboxX,
       y: this.state.bboxY,
-      width: Math.ceil(this.actualWidth()),
-      height: Math.ceil(this.actualHeight()),
+      width: this.actualWidth(),
+      height: this.actualHeight(),
       matrix: matrix,
       type: this.type,
       editor: this.renderEditor(),
       onKnobChange: this.handleKnobChange
     };
-    return <Selection key={this.id} element={this} {...props}>
+    return <Selection key={this.props.id} element={this} {...props}>
       {this.renderKnobs(props.width, props.height)}
     </Selection>;
   }
@@ -175,8 +170,8 @@ export default class Element extends React.Component {
   }
 
   componentDidUpdate(prevProps, prevState) {
-    const sizeChanged = this.state.width !== prevState.width
-      || this.state.height !== prevState.height
+    const sizeChanged = this.state.bboxWidth !== prevState.bboxWidth
+      || this.state.bboxHeight !== prevState.bboxHeight
       || this.state.bboxX !== prevState.bboxX
       || this.state.bboxY !== prevState.bboxY;
     if (sizeChanged) {
@@ -189,12 +184,22 @@ export default class Element extends React.Component {
     if (prevState.moving !== this.state.moving) {
       this.notifySizeChanged();
     }
+
+    if (this.state.selected !== prevState.selected) {
+      if (this.state.selected) {
+        this.context.canvas.focus();
+      }
+    }
   }
 
   componentDidMount() {
     this.applyTransformation(true);
     this.context.api.registerNode(this);
     this.context.canvas.registerNode(this);
+
+    if (this.state.selected) {
+      this.context.canvas.focus();
+    }
   }
 
   componentWillUnmount() {
@@ -206,18 +211,18 @@ export default class Element extends React.Component {
   applyTransformation(positionChanged) {
     const bbox = this.calcBBox();
     if (!bbox) return;
-    const width = this.props.width != null ? this.props.width : bbox.width;
-    const height = this.props.height != null ? this.props.height : bbox.height;
+    const bboxWidth = this.props.width != null ? this.props.width : bbox.width;
+    const bboxHeight = this.props.height != null ? this.props.height : bbox.height;
     const x = this.props.width == null ? bbox.x : 0;
     const y = this.props.height == null ? bbox.y : 0;
-    const sizeChanged = this.state.width !== width || this.state.height !== height
+    const sizeChanged = this.state.bboxWidth !== bboxWidth || this.state.bboxHeight !== bboxHeight
       || this.state.bboxX !== x || this.state.bboxY !== y;
     if (sizeChanged) {
       this.setState({
         bboxX: x,
         bboxY: y,
-        width,
-        height
+        bboxWidth,
+        bboxHeight
       });
     } else if (positionChanged) {
       this.notifySizeChanged();
@@ -230,9 +235,9 @@ export default class Element extends React.Component {
     return node.getBBox();
   }
 
-  calcTransform(x, y, width, height, anchorX, anchorY, rotate) {
+  calcTransform(x, y, width, height, anchorX, anchorY, currentWidth, currentHeight, rotate) {
     let transform = '';
-    transform += `translate(${x - (anchorX * width)}, ${y - (anchorY * height)})`;
+    transform += `translate(${x - (anchorX * currentWidth)}, ${y - (anchorY * currentHeight)})`;
     if (this.props.rotate && height != null && width != null) {
       transform += ` rotate(${rotate}, ${width * 0.5}, ${height * 0.5})`;
     }
@@ -270,18 +275,20 @@ export default class Element extends React.Component {
   }
 
   processRotate(rotate) {
-    let center = this.svgRoot().createSVGPoint();
-    center.x = this.state.bboxX + (this.state.width * 0.5);
-    center.y = this.state.bboxY + (this.state.height * 0.5);
+    const oldCenter = this.calcCenterPoint(this.state.bboxX, this.state.bboxY, this.state.bboxWidth, this.state.bboxHeight, this.props.rotate);
+    const newCenter = this.calcCenterPoint(this.state.bboxX, this.state.bboxY, this.state.bboxWidth, this.state.bboxHeight, rotate);
+    this.processChange('x', this.props.x + (oldCenter.x - newCenter.x), false);
+    this.processChange('y', this.props.y + (oldCenter.y - newCenter.y), false);
+    this.processChange('rotate', rotate);
+  }
+
+  calcCenterPoint(bboxX, bboxY, width, height, rotate) {
+    const center = this.svgRoot().createSVGPoint();
+    center.x = bboxX + (width * 0.5);
+    center.y = bboxY + (height * 0.5);
     const transform = this.svgRoot().createSVGTransform();
     transform.setRotate(rotate, 0, 0);
-    const rotatedCenter = center.matrixTransform(transform.matrix);
-    const transform2 = this.svgRoot().createSVGTransform();
-    transform2.setRotate(this.props.rotate, 0, 0);
-    const oldRotatedCenter = center.matrixTransform(transform2.matrix);
-    this.processChange('x', this.props.x + (oldRotatedCenter.x - rotatedCenter.x), false);
-    this.processChange('y', this.props.y + (oldRotatedCenter.y - rotatedCenter.y), false);
-    this.processChange('rotate', rotate);
+    return center.matrixTransform(transform.matrix);
   }
 
   processKnobChange(knob, dir, diffVector) {
@@ -324,15 +331,15 @@ export default class Element extends React.Component {
   }
 
   processChange(key, value, trigger = true) {
-    if (this.id) {
+    if (this.props.id) {
       let val = value;
       if (typeof val === 'number') {
         // val = Math.round(val * 10) / 10;
       }
       if (key === 'rotate') {
-        this.context.api.updateElement(this.id, key, val % 360);
+        this.context.api.updateElement(this.props.id, key, val % 360);
       } else {
-        this.context.api.updateElement(this.id, key, val);
+        this.context.api.updateElement(this.props.id, key, val);
       }
       if (trigger) {
         this.context.api.dataChanged();
@@ -348,15 +355,16 @@ export default class Element extends React.Component {
     this.mouseMoved = false;
     if (this.props.selectable) {
       e.stopPropagation();
+      e.preventDefault();
       if (this.props.selectDelegate) {
         this.props.selectDelegate.handleMouseDown(e);
       } else if (this.context.group) {
         this.context.group.handleMouseDown(e);
       }
       if (this.state.selected && e.shiftKey) {
-        this.context.api.deselectElement(this.id);
+        this.context.api.deselectElement(this.props.id);
       } else {
-        this.context.api.selectElement(this.id, this.props.selectDelegate || this.context.group || e.shiftKey);
+        this.context.api.selectElement(this.props.id, this.props.selectDelegate || this.context.group || e.shiftKey);
       }
       this.forceUpdate();
       if (this.props.movable) {
@@ -369,7 +377,7 @@ export default class Element extends React.Component {
     }
   };
   handleDragStart = (e) => {
-    e.preventDefault();
+    // e.preventDefault();
     e.stopPropagation();
     const svgRoot = this.svgRoot();
     let event = e.nativeEvent;
@@ -393,11 +401,12 @@ export default class Element extends React.Component {
   onDrag = (e) => {
     if (this.movePoint) {
       e.stopPropagation();
+      // e.preventDefault();
       if (!this.moved) {
         this.context.api.startChange();
       }
       if (!this.state.selected) {
-        this.context.api.selectElement(this.id);
+        this.context.api.selectElement(this.props.id);
       }
       if (!this.cursorLayer) {
         this.cursorLayer = document.createElement('div');
@@ -414,7 +423,7 @@ export default class Element extends React.Component {
       const changedEvent = e.touches ? e.touches[0] : e;
       this.movePoint.x = changedEvent.clientX;
       this.movePoint.y = changedEvent.clientY;
-      let p = this.movePoint.matrixTransform(this.node.parentNode.getScreenCTM().inverse());
+      const p = this.movePoint.matrixTransform(this.node.parentNode.getScreenCTM().inverse());
       this.moved = p.x !== this.startPoint.x || p.y !== this.startPoint.y;
       let newX = this.startX + (p.x - this.startPoint.x);
       let newY = this.startY + (p.y - this.startPoint.y);
@@ -448,8 +457,8 @@ export default class Element extends React.Component {
 
     if (this.moved) {
       this.context.api.finishChange();
-      this.context.canvas.clearSnaplines();
     }
+    this.context.canvas.clearSnaplines();
   };
 
   handleRef = (ref) => {
@@ -473,8 +482,8 @@ export default class Element extends React.Component {
     }
   };
 
-  highlight(toggle) {
-    this.setState({highlight: toggle});
+  highlight(highlight) {
+    this.setState({highlight});
   }
 
   contains(element) {
@@ -547,6 +556,8 @@ export default class Element extends React.Component {
       });
     }
 
+    // TODO: add snaplines created by renderer
+
     return snaplines;
   }
 
@@ -580,6 +591,8 @@ export default class Element extends React.Component {
       (this.props.height || 0),
       this.state.anchorX || this.props.anchorX || 0,
       this.state.anchorY || this.props.anchorY || 0,
+      this.state.bboxWidth || 0,
+      this.state.bboxHeight || 0,
       this.props.rotate);
     return (
       <g
@@ -594,10 +607,10 @@ export default class Element extends React.Component {
         {selectable ? <g ref={this.handleBBoxRef} transform={`translate(${this.state.bboxX || 0}, ${this.state.bboxY || 0})`}>
           <rect
             style={this.props.hoverOnBBox ? null : {pointerEvents: 'none'}}
-            x={this.state.width < 0 ? this.state.width : 0}
-            y={this.state.height < 0 ? this.state.height : 0}
-            width={Math.abs(this.state.width || 0)}
-            height={Math.abs(this.state.height || 0)}
+            x={this.state.bboxWidth < 0 ? this.state.bboxWidth : 0}
+            y={this.state.bboxHeight < 0 ? this.state.bboxHeight : 0}
+            width={Math.abs(this.state.bboxWidth || 0)}
+            height={Math.abs(this.state.bboxHeight || 0)}
             stroke="gray"
             vectorEffect="non-scaling-stroke"
             strokeDasharray="5 5"
@@ -612,3 +625,54 @@ export default class Element extends React.Component {
   }
 
 }
+
+Element.createClass = function (RenderFactory, defaultElementProps) {
+  const Base = Element;
+  RenderFactory.contextTypes = Object.assign({}, Base.contextTypes, RenderFactory.contextTypes);
+  RenderFactory.prototype.processChange = function (key, value, trigger) {
+    this.props._wrapper.processChange(key, value, trigger);
+  };
+
+  class F extends Base {
+    type = RenderFactory.type || Base.type;
+    Renderer = RenderFactory;
+
+    static defaultProps = Object.assign({}, Base.defaultProps, defaultElementProps);
+
+    constructor(props, context) {
+      super(props, context);
+    }
+
+    renderKnobs() {
+      if (this.renderInst.renderKnobs) {
+        const ret = this.renderInst.renderKnobs();
+        if (ret) {
+          return ret;
+        }
+      }
+      return super.renderKnobs();
+    }
+
+    renderEditor() {
+      if (this.renderInst.renderEditor) {
+        const ret = this.renderInst.renderEditor();
+        if (ret) {
+          return ret;
+        }
+      }
+      return super.renderEditor();
+    }
+
+    handleRenderer = (child) => {
+      this.renderInst = child;
+    };
+
+    renderChildren() {
+      const Renderer = this.Renderer;
+      return <Renderer ref={this.handleRenderer} _wrapper={this} {...this.props} {...this.state} />;
+    }
+  }
+
+
+  return F;
+};

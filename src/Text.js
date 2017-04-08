@@ -1,37 +1,48 @@
 import React, {PropTypes} from 'react';
 import bowser from 'bowser';
+import shallowequal from 'shallowequal';
 import Element from './Element';
 import TextEditor from './TextEditor';
 import EventListener from 'react-event-listener';
+import MobileTextEditor from './MobileTextEditor';
 const wrapProperties = ['text', 'fontSize', 'fontFamily', 'verticalAlign', 'lineHeight', 'textAnchor', 'width', 'padding', 'maxWidth'];
+const compareProps = wrapProperties.concat(['height', 'placeholder', 'placeholderFill', 'fill']);
 const isFirefox = bowser.firefox;
-const isChrome = bowser.chrome;
-const isSafari = bowser.safari || (bowser.ios && bowser.safari);
 const isMSIEdge = bowser.msie || bowser.msedge;
-const textStyle = {whiteSpace: isMSIEdge ? 'pre-wrap' : '', textRendering: 'geometricPrecision', pointerEvents: 'none'};
+const textStyle = {whiteSpace: isMSIEdge ? 'pre-wrap' : '', textRendering: 'geometricPrecision', userSelect: 'none', pointerEvents: 'none'};
 const isDebug = process.env.NODE_ENV !== 'production' && process.env.DEBUG;
-const divFontSize = 20;
 const textAlignMap = {
   start: 'left',
   middle: 'center',
   end: 'right'
 };
 
-const anchorMap = {
-  start: -1,
-  middle: 0,
-  end: 1
-};
+const WRAPPER_FONT_SIZE = 16;
 
-const vAlignMap = {
-  top: -1,
-  middle: 0,
-  end: 1
-};
+function positionTextNode(textNode, rect, textAnchor, innerWidth) {
+  let x = rect.left;
+  const y = rect.top - Math.round(Math.min(0, textNode.getBBox().y));
 
-export default class Text extends Element {
+  if (!isMSIEdge) {
+    textNode.setAttributeNS(null, 'text-anchor', textAnchor);
+    switch (textAnchor) {
+      case 'middle':
+        x = innerWidth * 0.5;
+        break;
+      case 'end':
+        x = innerWidth;
+        break;
+      default:
+        break;
+    }
+  }
+  textNode.setAttributeNS(null, 'x', `${x}`);
+  textNode.setAttributeNS(null, 'y', `${y}`);
+}
 
-  type = 'text';
+export class TextRenderer extends React.Component {
+
+  static type = 'text';
 
   static defaultProps = Object.assign({}, Element.defaultProps, {
     text: '',
@@ -41,7 +52,6 @@ export default class Text extends Element {
     lineHeight: 1.3,
     textAnchor: 'start',
     fill: 'black',
-    padding: 2,
     editable: true,
     background: 'transparent',
     maxWidth: null,
@@ -62,63 +72,40 @@ export default class Text extends Element {
 
   constructor(props, context) {
     super(props, context);
-    this.state = Object.assign(this.state, this.measureText(props));
+    this.state = this.measureText(props);
+  }
+
+  shouldComponentUpdate(nextProps, nextState, nextContext) {
+    const k = compareProps.find((key) => this.props[key] !== nextProps[key]);
+    return !shallowequal(this.state, nextState) || !shallowequal(this.context, nextContext) || !!k;
   }
 
   measureText(props, withoutRects) {
-    const width = (props.width ? props.width - (props.padding * 2) : 0);
-    const maxWidth = (props.maxWidth ? props.maxWidth - (props.padding * 2) : 0);
+    const scaleFactor = WRAPPER_FONT_SIZE / props.fontSize;
     const options = Object.assign({}, props, {
+      fontSize: WRAPPER_FONT_SIZE,
       text: props.text || (!this.state.editing ? props.placeholder : ' '),
-      width: props.width ? props.width - (props.padding * 2) : 0,
-      maxWidth: props.maxWidth ? props.maxWidth - (props.padding * 2) : 0,
+      width: (props.width ? props.width : 0) * scaleFactor,
+      maxWidth: (props.maxWidth ? props.maxWidth : 0) * scaleFactor,
       textAlign: textAlignMap[props.textAnchor]
     });
     const measurement = measureText(options, withoutRects);
+    measurement.height /= scaleFactor;
+    measurement.width /= scaleFactor;
     return {
       measurement
     };
   }
 
   measureTextHeight(props) {
-    return this.measureText(props, true).measurement.height + (2 * props.padding);
+    return this.measureText(props, true).measurement.height;
   }
 
   renderKnobs() {
     if (this.state.editing) {
       return [];
     }
-    return super.renderKnobs();
-  }
-
-  processKnobChange(knob, dir, diffVector) {
-    // if (dir === 'l' || dir === 'r' && (!this.props.height)) {
-    //   let np, newHeight, newWidth;
-    //   switch (dir) {
-    //     case 'l':
-    //       newWidth = this.props.width - diffVector.x;
-    //       newHeight = this.measureTextHeight(Object.assign({}, this.props, {width: newWidth}));
-    //       np = this.calcNewPositionForSize(newWidth, newHeight, 1, -1);
-    //       this.processChange('x', np.x, false);
-    //       this.processChange('y', np.y, false);
-    //       this.processChange('width', newWidth, true);
-    //       break;
-    //     case 'r':
-    //       // console.log(diffVector2.x);
-    //       newWidth = this.props.width + diffVector.x;
-    //       newHeight = this.measureTextHeight(Object.assign({}, this.props, {width: newWidth}));
-    //       np = this.calcNewPositionForSize(newWidth, 0, -1, -1);
-    //       this.processChange('x', np.x, false);
-    //       this.processChange('y', np.y, false);
-    //       this.processChange('width', newWidth, true);
-    //
-    //       break;
-    //     default:
-    //       break;
-    //   }
-    // } else {
-    super.processKnobChange(knob, dir, diffVector);
-    // }
+    return null;
   }
 
   componentWillReceiveProps(nextProps) {
@@ -131,28 +118,25 @@ export default class Text extends Element {
     }
   }
 
-  componentWillUpdate(nextPRops, nextState) {
-    if (!nextState.selected) {
+  componentWillUpdate(nextProps, nextState) {
+    if (!nextProps.selected) {
       nextState.editing = false;
-    } else {
-      nextState.hovered = false;
     }
   }
 
   componentDidMount() {
     this.wrapText();
-    super.componentDidMount();
   }
 
   componentDidUpdate(prevProps, prevState) {
-    if (this.state.measurement !== prevState.measurement) {
-      this.wrapText();
+    this.wrapText();
+
+    if (!prevProps.selected && this.props.selected) {
+      this.node.focus();
     }
 
-    super.componentDidUpdate(prevProps, prevState);
-
     if (this.state.editing !== prevState.editing) {
-      this.context.api.selectionChanged();
+      this.context.api.updateSelection(this);
       if (!this.state.editing) {
         this.context.api.finishChange();
         this.textEditor && this.textEditor.deactivate();
@@ -165,28 +149,30 @@ export default class Text extends Element {
     this.textEditor && this.textEditor.repositionTextArea();
   }
 
+  svgRoot() {
+    return this.node.viewportElement;
+  }
+
   wrapText() {
     const rects = this.state.measurement.rects;
     const baseline = this.state.measurement.baseline;
     let textContent = this.props.text || this.props.placeholder;
     const svgRoot = this.svgRoot();
     const p = svgRoot.createSVGPoint();
-    const innerWidth = this.props.width ? this.props.width : 0;
+    const innerWidth = (this.props.width ? this.props.width : 0) * (WRAPPER_FONT_SIZE / this.props.fontSize);
 
     if (rects) {
+      const measureThreshold = 0.7;
+      const hardLines = textContent.split('\n');
+      const hardLineIndex = 0;
       let rect;
       let textNode;
-      const measureThreshold = isSafari ? this.props.fontSize / 300 : this.props.fontSize * 0.2;
       let num;
       let lastTop = rects[0].top;
-      let hardLines = textContent.split('\n');
-      let hardLineIndex = 0;
       let lastLineIndex = hardLineIndex;
       let currentLine = hardLines[hardLineIndex];
-      let currentLineIndex = hardLineIndex;
       let lastTextContent = '';
       let rectIndex = 0;
-
       hardLines.forEach((hardLine) => {
         currentLine = hardLine;
         if (rectIndex < rects.length) {
@@ -194,47 +180,38 @@ export default class Text extends Element {
             rect = rects[rectIndex];
             textNode = this.textWrapperNode.childNodes[rectIndex];
             textNode.textContent = ' ';
-            textNode.setAttributeNS(null, 'x', `${rect.left}`);
-            textNode.setAttributeNS(null, 'y', rect.top - Math.round(Math.min(0, textNode.getBBox().y)));
+            positionTextNode(textNode, rect, this.props.textAnchor, innerWidth);
             rectIndex++;
-          }
-          while (currentLine.length > 0 && rectIndex < rects.length) {
-            // prepare text node for measuring
-            rect = rects[rectIndex];
-            textNode = this.textWrapperNode.childNodes[rectIndex];
-            textNode.removeAttributeNS(null, 'x');
-            textNode.removeAttributeNS(null, 'y');
-            textNode.removeAttributeNS(null, 'text-anchor');
-            // if there is a soft break and the hardline is already broken
-            // trim all leading white spaces from the current line
-            if (lastTop !== rect.top && currentLine !== hardLine) {
-              if (/\s/.test(lastTextContent.substr(-1)) || isFirefox) {
-                currentLine = currentLine.replace(/^\s+/, '');
+          } else {
+            while (currentLine.length > 0 && rectIndex < rects.length) {
+              // prepare text node for measuring
+              rect = rects[rectIndex];
+              textNode = this.textWrapperNode.childNodes[rectIndex];
+              textNode.removeAttributeNS(null, 'x');
+              textNode.removeAttributeNS(null, 'y');
+              textNode.removeAttributeNS(null, 'text-anchor');
+
+              // if there is a soft break and the hardline is already broken
+              // trim all leading white spaces from the current line
+              if (lastTop !== rect.top && currentLine !== hardLine) {
+                if (/\s/.test(lastTextContent.substr(-1)) || isFirefox) {
+                  currentLine = currentLine.replace(/^\s+/, '');
+                }
               }
-            }
-            // set textContent for measuring
-            textNode.textContent = currentLine;
+              // set textContent for measuring
+              textNode.textContent = currentLine;
 
-            // configure measure point
-            p.y = rect.height * 0.5;
-            if (isFirefox || isChrome) {
-              // for firefox and chrome make the point a lil bit smaller
-              p.x = rect.width > measureThreshold ? rect.width - measureThreshold : rect.width;
-            } else {
-              // for safari we get an integer value
+              // configure measure point
+              p.y = rect.height * 0.5;
               p.x = rect.width;
-            }
 
-            // if the measure point is wider than the text node,
-            // then use the full text content length
-            if (p.x > textNode.getBBox().width) {
-              num = textNode.textContent.length - 1;
-            } else {
-              // else get the char position of the measure point
-              num = textNode.getCharNumAtPosition(p);
-              // for safari we need a special handling
-              // safari measures always the next char
-              if (isSafari) {
+              // if the measure point is wider than the text node,
+              // then use the full text content length
+              if (p.x > textNode.getBBox().width) {
+                num = textNode.textContent.length - 1;
+              } else {
+                // else get the char position of the measure point
+                num = textNode.getCharNumAtPosition(p);
                 // if the num is smaller 0, we measured over the text content
                 // so its the text content length - 1
                 if (num < 0) {
@@ -243,132 +220,41 @@ export default class Text extends Element {
                   // else check if the endposition of the measured char
                   // is inside the measure point
                   // if not, move to prev char
-                  const ep = textNode.getEndPositionOfChar(num);
-                  if (ep.x > p.x && num > 0) {
-                    num = num - 1;
+                  if (num > 0) {
+                    while (textNode.getEndPositionOfChar(num).x - p.x > measureThreshold) {
+                      num--;
+                    }
                   }
                 }
               }
-            }
-            // cut the current line apart
-            if (num > -1) {
-              textNode.textContent = currentLine.substr(0, num + 1);
-              currentLine = currentLine.substr(num + 1).replace(/\r$/, '');
-            }
-            // position text node by text anchor
-            let x = rect.left;
-            if (!isMSIEdge) {
-              textNode.setAttributeNS(null, 'text-anchor', this.props.textAnchor);
-              switch (this.props.textAnchor) {
-                case 'middle':
-                  x = innerWidth * 0.5;
-                  break;
-                case 'end':
-                  x = innerWidth;
-                  break;
-                default:
-                  break;
+              // cut the current line apart
+              if (num > -1) {
+                textNode.textContent = currentLine.substr(0, num + 1);
+                currentLine = currentLine.substr(num + 1).replace(/\r$/, '');
               }
-            }
-            textNode.setAttributeNS(null, 'x', `${x}`);
-            textNode.setAttributeNS(null, 'y', rect.top - Math.round(Math.min(0, textNode.getBBox().y)));
+              // position text node by text anchor
+              positionTextNode(textNode, rect, this.props.textAnchor, innerWidth);
 
-            // save last rect top
-            lastTop = rect.top;
-            lastTextContent = textNode.textContent;
-            
-            // move to next measure rect
-            rectIndex++;
+              // save last rect top
+              lastTop = rect.top;
+              lastTextContent = textNode.textContent;
 
-            let nextRect = rects[rectIndex];
-            // if the current line is empty
-            // and the next rect is on the same line
-            // jump over it
-            // we don't need to handle it
-            if (!currentLine && nextRect && nextRect.top === lastTop) {
+              // move to next measure rect
               rectIndex++;
+
+              let nextRect = rects[rectIndex];
+              // if the current line is empty
+              // and the next rect is on the same line
+              // jump over it
+              // we don't need to handle it
+              if (!currentLine && nextRect && nextRect.top === lastTop) {
+                rectIndex++;
+              }
             }
           }
         }
       });
 
-
-      // for (let i = 0; i < rects.length; i++) {
-      //   rect = rects[i];
-      //   textNode = this.textWrapperNode.childNodes[i];
-      //   textNode.removeAttributeNS(null, 'x');
-      //   textNode.removeAttributeNS(null, 'y');
-      //   textNode.removeAttributeNS(null, 'text-anchor');
-      //   if (lastTop !== rect.top) {
-      //     currentLineIndex++;
-      //   }
-      //   // if we have a softbreak delete all leading spaces
-      //   if (lastLineIndex === hardLineIndex && lastTop !== rect.top && !isMSIEdge) {
-      //     if (/\s/.test(lastTextContent.substr(-1)) || isFirefox) {
-      //       currentLine = currentLine.replace(/^\s+/, '');
-      //     }
-      //   }
-      //   textNode.textContent = currentLine;
-      //   p.y = rect.height * 0.5;
-      //   p.x = rect.width;
-      //   lastLineIndex = hardLineIndex;
-      //
-      //   // TODO: trail ending spaces from right aligned text
-      //   if (isFirefox || isChrome) {
-      //     p.x = rect.width > measureThreshold ? rect.width - measureThreshold : rect.width;
-      //   }
-      //   if (p.x > textNode.getBBox().width) {
-      //     num = textNode.textContent.length - 1;
-      //   } else {
-      //     num = textNode.getCharNumAtPosition(p);
-      //     if (isSafari) {
-      //       if (num < 0) {
-      //         num = textNode.textContent.length - 1;
-      //       } else {
-      //         const ep = textNode.getEndPositionOfChar(num);
-      //         if (ep.x > p.x && num > 0) {
-      //           num = num - 1;
-      //         }
-      //       }
-      //     }
-      //   }
-      //
-      //   // console.log(p.x, textNode.getEndPositionOfChar(num + 1), textNode.textContent, num);
-      //   if (num > -1) {
-      //     textNode.textContent = currentLine.substr(0, num + 1);
-      //     currentLine = currentLine.substr(num + 1).replace(/\r$/, '');
-      //   }
-      //   // console.log(textNode.textContent + "|");
-      //
-      //   let x = rect.left;
-      //   if (!isMSIEdge) {
-      //     textNode.setAttributeNS(null, 'text-anchor', this.props.textAnchor);
-      //     switch (this.props.textAnchor) {
-      //       case 'middle':
-      //         x = innerWidth * 0.5;
-      //         break;
-      //       case 'end':
-      //         x = innerWidth;
-      //         break;
-      //       default:
-      //         break;
-      //     }
-      //   }
-      //   textNode.setAttributeNS(null, 'x', `${x}`);
-      //   textNode.setAttributeNS(null, 'y', rect.top - Math.round(Math.min(0, textNode.getBBox().y)));
-      //
-      //   if (num < 0 || ((isFirefox || isMSIEdge) && !currentLine)) {
-      //     hardLineIndex += 1;
-      //     currentLine = hardLines[hardLineIndex];
-      //   }
-      //
-      //
-      //   lastTop = rect.top;
-      //   lastTextContent = textNode.textContent;
-      //   if (!textNode.textContent) {
-      //     textNode.textContent = ' ';
-      //   }
-      // }
     }
   }
 
@@ -377,7 +263,7 @@ export default class Text extends Element {
   };
 
   handleTextChange = (val) => {
-    this.processChange('text', val, true);
+    this.props._wrapper.processChange('text', val, true);
   };
 
   handleTextBlur = () => {
@@ -392,6 +278,22 @@ export default class Text extends Element {
       });
       props.textAlign = textAlignMap[this.props.textAnchor];
       props.fill = this.props.fill;
+      props.fontSize = WRAPPER_FONT_SIZE;
+      props.scaleFactor = this.props.fontSize / WRAPPER_FONT_SIZE;
+
+      const maxWidth = this.props.maxWidth ? this.props.maxWidth - 0.01 : null;
+      const width = this.props.width ? (this.props.width) - 0.01 : null;
+
+      if(this.props.useMobileEditor) {
+        return <MobileTextEditor {...props}
+                                 key={this.props.id}
+                                 ref={this.handeTextEditor}
+                                 maxWidth={maxWidth}
+                                 width={width}
+                                 onTextChange={this.handleTextChange}
+                                 onBlur={this.handleTextBlur}
+        />
+      }
 
       const bbox = this.textWrapperNode.firstChild.getBBox();
       let textBaseline;
@@ -408,7 +310,7 @@ export default class Text extends Element {
       }
 
       if (this.props.height) {
-        const calculatedBoxHeight = this.state.measurement.height + (this.props.padding * 2);
+        const calculatedBoxHeight = this.state.measurement.height;
         switch (this.props.verticalAlign) {
           case 'middle':
             dy += (this.props.height - calculatedBoxHeight) * 0.5;
@@ -421,15 +323,15 @@ export default class Text extends Element {
 
       return <TextEditor
         {...props}
-        key={this.id}
+        key={this.props.id}
         ref={this.handeTextEditor}
-        x={this.props.padding} y={this.props.padding + dy}
-        maxWidth={this.props.maxWidth ? this.props.maxWidth - (this.props.padding * 2) - 0.01 : null}
-        width={this.props.width ? (this.props.width) - (this.props.padding * 2) - 0.01 : 'auto'}
+        maxWidth={maxWidth}
+        width={width}
         onTextChange={this.handleTextChange}
         onBlur={this.handleTextBlur}
-        height={(this.state.height || 0) - (this.props.padding * 2)}
         text={this.props.text}
+        x={0} y={(dy * props.scaleFactor)}
+        height={(this.state.height || 0)}
       />;
     } else {
       return null;
@@ -443,13 +345,13 @@ export default class Text extends Element {
     if (this.state.editing) {
       e.stopPropagation();
     }
-    if (this.props.editable && this.state.selected) {
+    if (this.props.editable && this.props.selected) {
       this.textDownTime = e.timeStamp;
     }
   };
 
   handleTextUp = (e) => {
-    if (!this.state.moving && this.props.editable && this.state.selected) {
+    if (!this.state.moving && this.props.editable && this.props.selected) {
       if (e.timeStamp - this.textDownTime < 200) {
         this.setState({editing: true});
       }
@@ -457,8 +359,9 @@ export default class Text extends Element {
   };
 
   handleKeyPress = (e) => {
-    if (e.srcElement === document.body && !(e.metaKey || e.ctrlKey) && !this.state.editing) {
-      this.processChange('text', '', true);
+    if (this.props.selected && !e.defaultPrevented && e.target === this.context.canvas.wrapperNode && !(e.metaKey || e.ctrlKey) && !this.state.editing && e.charCode > 0) {
+      e.preventDefault();
+      this.processChange('text', String.fromCharCode(e.charCode), true);
       this.setState({editing: true});
     }
   };
@@ -467,10 +370,14 @@ export default class Text extends Element {
     this.textWrapperNode = ref;
   };
 
-  renderChildren() {
+  handleNode = (ref) => {
+    this.node = ref;
+  };
+
+  render() {
     const measurement = this.state.measurement;
     const rects = measurement.rects;
-    const calculatedBoxHeight = measurement.height + (this.props.padding * 2);
+    const calculatedBoxHeight = measurement.height;
     const height = this.props.height || 0;
     const width = this.props.width || 0;
 
@@ -493,8 +400,8 @@ export default class Text extends Element {
         break;
     }
 
-    let tx = this.props.padding;
-    const calculatedBoxWidth = measurement.width + (this.props.padding * 2);
+    let tx = 0;
+    const calculatedBoxWidth = measurement.width;
     switch (this.props.textAnchor) {
       case 'start':
         break;
@@ -511,22 +418,23 @@ export default class Text extends Element {
     }
 
     return (<g
+      ref={this.handleNode}
       transform={`translate(0, ${y})`}
       onTouchStart={this.handleTextDown}
       onMouseDown={this.handleTextDown}
       onMouseUp={this.handleTextUp}
       onTouchEnd={this.handleTextUp}
     >
-      {this.state.selected && this.props.editable ? <EventListener target="window" onKeyPress={this.handleKeyPress}/> : null}
+      <EventListener target="window" onKeyPress={this.handleKeyPress}/>
       {<g ref={this.handleTextBBox}>
         <rect
           transform={`translate(${x}, 0)`}
-          width={this.props.width || (measurement.width + (2 * this.props.padding))}
-          height={measurement.height + (2 * this.props.padding)}
+          width={this.props.width || (measurement.width)}
+          height={measurement.height}
           fill={this.props.background}
         />
       </g>}
-      {<g transform={`translate(${tx}, ${this.props.padding})`}>
+      {<g transform={`translate(${tx}, 0)`}>
         <g>
           {isDebug ? rects.map((line, i) => {
             return <rect
@@ -538,11 +446,11 @@ export default class Text extends Element {
             />;
           }) : null}
         </g>
-        <g ref={this.handleTextWrapperRef}>
+        <g ref={this.handleTextWrapperRef} transform={`scale(${this.props.fontSize / WRAPPER_FONT_SIZE})`}>
           {rects.map((line, i) => {
             return <text
-              key={`${i}'_'${line.left}`} xmlSpace="preserve" style={textStyle} fontFamily={this.props.fontFamily} fontSize={(Math.round(this.props.fontSize * 100) / 100) + ''}
-              dy="1em" y={line.top} fill={this.state.editing ? 'transparent' : this.props.fill}
+              key={`${i}'_'${line.left}`} xmlSpace="preserve" style={textStyle} fontFamily={this.props.fontFamily} fontSize={WRAPPER_FONT_SIZE}
+              dy="1em" fill={this.state.editing ? 'transparent' : this.props.fill}
             />;
           })}
         </g>
@@ -552,8 +460,10 @@ export default class Text extends Element {
 
 }
 
+export default Element.createClass(TextRenderer);
 
-var divWrapper;
+
+let divWrapper;
 function createDivWrapper() {
   const outerOutsideWrapper = document.createElement('div');
   outerOutsideWrapper.style.position = 'absolute';
@@ -589,21 +499,29 @@ function createDivWrapper() {
 }
 
 function prepareDivWrapper(options) {
-  const {text, fontSize, fontFamily, maxWidth, width, textAlign, lineHeight} = options;
+  const scaleFactor = WRAPPER_FONT_SIZE / options.fontSize;
+  const {text, fontFamily, maxWidth, width, maxHeight, textAnchor, lineHeight} = options;
   divWrapper = divWrapper || createDivWrapper();
   divWrapper.innerHTML = '';
   divWrapper.style.fontFamily = fontFamily;
-  divWrapper.style.lineHeight = lineHeight;
-  divWrapper.style.fontSize = `${fontSize}px`;
-  divWrapper.style.width = width ? `${width}px` : 'auto';
-  divWrapper.style.maxWidth = maxWidth ? `${maxWidth}px` : 'none';
-  divWrapper.style.textAlign = textAlign;
-  divWrapper.innerHTML = `<span>${text.replace(/\r?\n/gi, '<br/>')}</span>`;
+  divWrapper.style.whiteSpace = !width && !maxWidth ? 'nowrap' : 'pre-wrap';
+  divWrapper.style.lineHeight = lineHeight || 1.3;
+  divWrapper.style.fontSize = `${WRAPPER_FONT_SIZE}px`;
+  divWrapper.style.width = width ? `${width * scaleFactor}px` : 'auto';
+  divWrapper.style.maxWidth = maxWidth ? `${maxWidth * scaleFactor}px` : 'none';
+  divWrapper.style.maxHeight = maxHeight ? `${maxHeight * scaleFactor}px` : 'none';
+  divWrapper.style.textAlign = textAlignMap[textAnchor];
+  let innerText = (text == null ? '' : text + '').replace(/\n$/, isMSIEdge ? '\n&nbsp;' : '\n\n').replace(/\r?\n/gi, '<br/>');
+  if (divWrapper.style.whiteSpace === 'nowrap') {
+    innerText = innerText.replace(/\s/g, '&nbsp;');
+  }
+  divWrapper.innerHTML = `<span>${innerText}</span>`;
 
   return divWrapper;
 }
 
 function measureText(options, withoutRects) {
+  const scaleFactor = WRAPPER_FONT_SIZE / options.fontSize;
   divWrapper = prepareDivWrapper(options);
   const rects = divWrapper.firstChild.getClientRects();
   const topRect = divWrapper.getBoundingClientRect();
@@ -614,20 +532,33 @@ function measureText(options, withoutRects) {
     width = Math.max(rect.width, width);
   });
 
+  let retRects = [].map.call(rects, (rect) => {
+    return {
+      left: (rect.left - topRect.left),
+      top: (rect.top - topRect.top - firstLineOffset),
+      bottom: (rect.bottom - topRect.top),
+      absoluteBottom: topRect.bottom,
+      width: rect.width,
+      height: rect.height
+    };
+  });
+  let height = (divWrapper.offsetHeight - (2 * firstLineOffset));
+  const optionHeight = options.maxHeight || options.height;
+  if (optionHeight) {
+    const maxHeight = optionHeight * scaleFactor;
+    retRects = retRects.filter(rect => {
+      const fitsIn = rect.top + rect.height + 2 * firstLineOffset < maxHeight;
+      height = fitsIn ? rect.top + rect.height : height;
+      return fitsIn;
+    });
+  }
+
   return {
-    width: (width),
-    height: (divWrapper.offsetHeight - (2 * firstLineOffset)),
+    width: width / scaleFactor,
+    height: height / scaleFactor,
     firstLineOffset: firstLineOffset,
+    firstLineHeight: (rects[0].height) / scaleFactor,
     baseline: baseline,
-    rects: !withoutRects ? [].map.call(rects, (rect) => {
-      return {
-        left: (rect.left - topRect.left),
-        top: (rect.top - topRect.top - firstLineOffset),
-        bottom: (rect.bottom - topRect.top),
-        absoluteBottom: topRect.bottom,
-        width: rect.width,
-        height: rect.height
-      };
-    }) : []
+    rects: retRects
   };
-};
+}

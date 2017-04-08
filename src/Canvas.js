@@ -2,18 +2,20 @@ import React, {PropTypes} from 'react';
 import EventListener from 'react-event-listener';
 import Api from './Api';
 
-const wrapperStyle = {width: '100%', height: '100%', overflow: 'auto', position: 'absolute'};
-
 export default class Canvas extends React.Component {
 
   static propTypes = {
     api: PropTypes.instanceOf(Api),
     zoom: PropTypes.number,
-    onFirstRender: PropTypes.func
+    fixed: PropTypes.bool,
+    onFirstRender: PropTypes.func,
+    snapDistance: PropTypes.number
   };
 
   static defaultProps = {
-    zoom: 1
+    fixed: false,
+    zoom: 1,
+    snapDistance: 5
   };
 
   static childContextTypes = {
@@ -52,13 +54,12 @@ export default class Canvas extends React.Component {
   }
 
   componentWillUnmount() {
-    // this.api.unbind('selectionChanged', this.handleSelectionChange);
+    this.api.unbind('selectionChanged', this.handleSelectionChange);
     this.api.unbind('dataChanged', this.handleDataChange);
   }
 
   componentDidMount() {
     this.checkIfReadyForRender();
-    document.addEventListener('keydown', this.handleKeyDown);
   }
 
   checkIfReadyForRender() {
@@ -103,6 +104,15 @@ export default class Canvas extends React.Component {
       || prevState.width !== this.state.width
       || prevState.height !== this.state.height) {
       this.props.api.selectionChanged();
+      this.centerContent();
+    }
+  }
+
+  centerContent() {
+    if (this.props.fixed) {
+      const bbox = this.svgRoot.parentNode.getBoundingClientRect();
+      this.wrapperNode.scrollLeft = (this.state.width - bbox.width) * 0.5;
+      this.wrapperNode.scrollTop = (this.state.height - bbox.height) * 0.5;
     }
   }
 
@@ -130,11 +140,14 @@ export default class Canvas extends React.Component {
   }
 
   findSnaplines(node, snaplines) {
+    if (!this.possibleSnaplines) {
+      return {x: 0, y: 0};
+    }
     const matchingSnaplines = [];
     const matchedSnapline = {};
     const diffs = {x: 0, y: 0};
-    (this.state.snaplines || []).forEach(s => s.ref.highlight(false));
-    const maxDiff = {x: 5, y: 5};
+    // (this.state.snaplines || []).forEach(s => s.ref.highlight(false));
+    const maxDiff = {x: 3 * this.props.zoom, y: 3 * this.props.zoom};
     (snaplines || []).forEach((tmpSnapline) => {
       tmpSnapline = matchedSnapline[tmpSnapline.mode] || tmpSnapline;
       this.possibleSnaplines.forEach((snapline) => {
@@ -148,8 +161,9 @@ export default class Canvas extends React.Component {
       });
     });
 
-    matchingSnaplines.forEach((s) => {
-      s.ref.highlight(true);
+
+    this.possibleSnaplines.forEach((s) => {
+      s.ref.highlight(!!(matchedSnapline[s.mode] && matchedSnapline[s.mode].ref === s.ref));
     });
 
     this.setState({
@@ -159,15 +173,19 @@ export default class Canvas extends React.Component {
   }
 
   registerNode(node) {
-    this.nodes[node.id] = node;
+    if (node.props.id) {
+      this.nodes[node.props.id] = node;
+    }
   }
 
   unregisterNode(node) {
-    delete this.nodes[node.id];
+    if (node.props.id) {
+      delete this.nodes[node.props.id];
+    }
   }
 
   clearSnaplines() {
-    this.state.snaplines.forEach(s => s.ref.highlight(false));
+    this.state.snaplines && this.state.snaplines.forEach(s => s.ref.highlight(false));
     this.setState({
       snaplines: null
     });
@@ -177,12 +195,16 @@ export default class Canvas extends React.Component {
     let possibleSnaplines = [];
     Object.keys(this.nodes).forEach((nodeId) => {
       const oNode = this.nodes[nodeId];
-      if (nodeId !== node.id && !node.contains(oNode)) {
+      if (nodeId !== node.props.id && !node.contains(oNode)) {
         possibleSnaplines = possibleSnaplines.concat(oNode.getCurrentSnaplines());
       }
     });
 
     this.possibleSnaplines = possibleSnaplines;
+  }
+
+  focus() {
+    this.wrapperNode && this.wrapperNode.focus();
   }
 
   handleResize = () => {
@@ -195,12 +217,13 @@ export default class Canvas extends React.Component {
 
   handleKeyDown = (e) => {
     const api = this.props.api;
-    if (e.srcElement === document.body) {
+    if (!/input|textarea/gi.test(e.srcElement.tagName) && !e.srcElement.getAttribute('contenteditable')) {
       if (e.which === 8 || e.which === 46) {
         api.removeSelectedElements();
         api.dataChanged();
         api.selectionChanged();
       } else if (e.which === 90 && e.metaKey) {
+        e.preventDefault();
         if (!e.shiftKey) {
           api.undo();
         } else {
@@ -267,8 +290,11 @@ export default class Canvas extends React.Component {
       return <div ref={this.handleLoadingRef}>Loading ...</div>;
     }
 
-    return (<div style={wrapperStyle} ref={this.handleWrapperRef}>
-      <EventListener target="window" onResize={this.handleResize} />
+    const wrapperStyle = {width: '100%', height: '100%', overflow: this.props.fixed ? 'hidden' : 'auto', position: 'absolute'};
+
+    return (<div style={wrapperStyle} ref={this.handleWrapperRef} tabIndex="-1">
+      <EventListener target="window" onResize={this.handleResize}/>
+      <EventListener target="window" onKeyDown={this.handleKeyDown}/>
       <svg
         xmlns="http://www.w3.org/2000/svg" version="1.1"
         width={this.state.width || '100%'} height={this.state.height || '100%'}
@@ -290,8 +316,8 @@ export default class Canvas extends React.Component {
             <g className="slide-elements">
               {this.state.slide.elements.map((el) => {
                 const factory = this.props.api.resolveFactory(el.type);
-                const {_id, ...other} = el;
-                return React.createElement(factory, {key: _id, _id: _id, ...other});
+                const {id, ...other} = el;
+                return React.createElement(factory, {key: id, id, ...other});
               })}
             </g>
             <g className="snaplines">

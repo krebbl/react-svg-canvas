@@ -6,8 +6,7 @@ export default class Knob extends React.Component {
   static propTypes = {
     onChange: PropTypes.func,
     onDone: PropTypes.func,
-    onStart: PropTypes.func,
-    inner: PropTypes.node
+    onStart: PropTypes.func
   };
 
   static defaultProps = {
@@ -23,11 +22,15 @@ export default class Knob extends React.Component {
   handleStartDrag = (e) => {
     document.activeElement.blur();
     e.nativeEvent.preventDefault();
+    this.relativeStartPoint = e.relativeStartPoint;
     this.context.api.startChange();
     this.props.onStart && this.props.onStart();
   };
 
   handleDrag = (e) => {
+    e.relativePoint.x -= this.relativeStartPoint.x;
+    e.relativePoint.y -= this.relativeStartPoint.y;
+
     this.props.onChange && this.props.onChange(this, e.relativePoint);
   };
 
@@ -41,10 +44,10 @@ export default class Knob extends React.Component {
     const {matrix} = this.context;
     const f = Math.sqrt((matrix.a ** 2) + (matrix.b ** 2));
 
-    const knob = this.props.inner || (<g>
-      <circle r={8} fill="transparent" />
-      <circle r={6} fill="white" />
-      <circle r={4} fill="#3a7ed2" />
+    const knob = this.props.children || (<g>
+      <circle r={14} fill="transparent" />
+      <circle r={10} fill="white" />
+      <circle r={7} fill="#3a7ed2" />
     </g>);
     return (<Draggable
       onDragStart={this.handleStartDrag}

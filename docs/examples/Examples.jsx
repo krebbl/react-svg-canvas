@@ -167,11 +167,11 @@ export default class Examples extends React.Component {
       </div>
       <div style={{position: 'absolute', right: 0, top: 0, width: 200}}>
         {this.state.selectedElements.map((element) => {
-          const factory = api.getNode(element._id).constructor;
-          return <div key={element._id}>
-            <h6>{`${factory.name} / ${element._id}`}</h6>
+          const factory = api.getNode(element.id).constructor;
+          return <div key={element.id}>
+            <h6>{`${factory.name} / ${element.id}`}</h6>
             {Object.keys(factory.propTypes).map((key) => {
-              if (key === '_id') {
+              if (key === 'id') {
                 return null;
               }
               const type = getPropType(factory.propTypes[key]);
@@ -182,8 +182,8 @@ export default class Examples extends React.Component {
                 <label>{key}</label><br/>
                 <Input
                   type={type}
-                  value={api.getValue(element._id, [key])}
-                  onChange={e => this.handleChange(element._id, type, key, e.target.value)}/>
+                  value={api.getValue(element.id, [key])}
+                  onChange={e => this.handleChange(element.id, type, key, e.target.value)}/>
               </div>;
             })}
           </div>

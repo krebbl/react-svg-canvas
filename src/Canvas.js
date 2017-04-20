@@ -27,8 +27,8 @@ export default class Canvas extends React.Component {
     super(props, context);
 
     this.api = props.api;
-    this.api.on('selectionChanged', this.handleSelectionChange);
-    this.api.on('dataChanged', this.handleDataChange);
+    this.api.on('selectionChange', this.handleSelectionChange);
+    this.api.on('dataChange', this.handleDataChange);
 
     this.snaplines = {};
     this.nodes = {};
@@ -54,8 +54,8 @@ export default class Canvas extends React.Component {
   }
 
   componentWillUnmount() {
-    this.api.unbind('selectionChanged', this.handleSelectionChange);
-    this.api.unbind('dataChanged', this.handleDataChange);
+    this.api.unbind('selectionChange', this.handleSelectionChange);
+    this.api.unbind('dataChange', this.handleDataChange);
   }
 
   componentDidMount() {
@@ -80,11 +80,11 @@ export default class Canvas extends React.Component {
 
   componentWillReceiveProps(nextProps) {
     if (nextProps.api !== this.props.api && nextProps.api) {
-      this.props.api.unbind('selectionChanged', this.handleSelectionChange);
-      this.props.api.unbind('dataChanged', this.handleDataChange);
+      this.props.api.unbind('selectionChange', this.handleSelectionChange);
+      this.props.api.unbind('dataChange', this.handleDataChange);
 
-      nextProps.api.bind('selectionChanged', this.handleSelectionChange);
-      nextProps.api.bind('dataChanged', this.handleDataChange);
+      nextProps.api.bind('selectionChange', this.handleSelectionChange);
+      nextProps.api.bind('dataChange', this.handleDataChange);
 
       this.handleDataChange();
       this.handleSelectionChange();
@@ -220,8 +220,8 @@ export default class Canvas extends React.Component {
     if (!/input|textarea/gi.test(e.srcElement.tagName) && !e.srcElement.getAttribute('contenteditable')) {
       if (e.which === 8 || e.which === 46) {
         api.removeSelectedElements();
-        api.dataChanged();
-        api.selectionChanged();
+        api.triggerDataChange();
+        api.triggerSelectionChange();
       } else if (e.which === 90 && e.metaKey) {
         e.preventDefault();
         if (!e.shiftKey) {

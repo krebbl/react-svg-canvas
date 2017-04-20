@@ -63,7 +63,7 @@ export default class Api extends EventDispatcher {
   selectSlide(index) {
     if (this.slides[index]) {
       this.slide = this.slides[index];
-      this.dataChanged();
+      this.triggerDataChange();
     }
   }
 
@@ -180,7 +180,7 @@ export default class Api extends EventDispatcher {
     this.currentState = {cache: this.elements, slide: this.slide, selection: this.selection};
     this.history = Immutable(this.history.slice(0, this.historyPointer + 1).concat([state]));
     this.historyPointer = this.history.length;
-    this.historyChanged();
+    this.triggerHistoryChange();
   }
 
   undo() {
@@ -191,8 +191,9 @@ export default class Api extends EventDispatcher {
       this.elements = entry.cache;
       this.selection = entry.selection;
       this.pathCache = {};
-      this.dataChanged();
-      this.selectionChanged();
+      this.triggerDataChange();
+      this.triggerSelectionChange();
+      this.triggerFinishChange();
     }
   }
 
@@ -211,8 +212,9 @@ export default class Api extends EventDispatcher {
       this.elements = entry.cache;
       this.selection = entry.selection;
       this.pathCache = {};
-      this.dataChanged();
-      this.selectionChanged();
+      this.triggerDataChange();
+      this.triggerSelectionChange();
+      this.triggerFinishChange();
     }
   }
 
@@ -231,9 +233,12 @@ export default class Api extends EventDispatcher {
 
   getChildren(id, deep) {
     const element = this.getElement(id);
+    if(!element) {
+      return [];
+    }
     let children = [];
     Object.keys(element).forEach((key) => {
-      if (typeof (element[key]) === 'object') {
+      if (element[key] != null && typeof (element[key]) === 'object') {
         if (element[key].id) {
           children.push(element[key]);
         }
@@ -250,7 +255,13 @@ export default class Api extends EventDispatcher {
   }
 
   removeElement(id) {
-    const p = this.getDataPath(id).slice();
+    let p = this.getDataPath(id);
+    if (!p) {
+      return;
+    }
+
+    p = p.slice();
+
     const deleteKey = p.pop();
 
     if (deleteKey == null) {
@@ -298,7 +309,7 @@ export default class Api extends EventDispatcher {
       // TODO: think about this
       // if there is no node, that can handle the change, just update the element
       this.updateElement(id, key, value);
-      this.dataChanged();
+      this.triggerDataChange();
     }
   }
 
@@ -310,8 +321,9 @@ export default class Api extends EventDispatcher {
     if (this._currentState) {
       if (!deepEqual(this._currentState.slide, this.slide)) {
         this.saveInHistory(this._currentState);
-        this.dataChanged();
-        this.selectionChanged();
+        this.triggerDataChange();
+        this.triggerSelectionChange();
+        this.triggerFinishChange();
       }
       this._currentState = null;
     }
@@ -372,8 +384,8 @@ export default class Api extends EventDispatcher {
     });
     this.finishChange();
 
-    this.selectionChanged();
-    this.dataChanged();
+    this.triggerSelectionChange();
+    this.triggerDataChange();
   }
 
   getValue(id, key) {
@@ -430,12 +442,12 @@ export default class Api extends EventDispatcher {
     if (id) {
       this.selection = this.selection.set(id, true);
     }
-    this.selectionChanged();
+    this.triggerSelectionChange();
   }
 
   deselectElement(id) {
     this.selection = this.selection.without(id);
-    this.selectionChanged();
+    this.triggerSelectionChange();
   }
 
   registerNode(node) {
@@ -462,7 +474,7 @@ export default class Api extends EventDispatcher {
     if (this.isNodeSelected(node)) {
       this.selection = this.selection.set(node.props.id, true);
       this.nodes[node.props.id] = node;
-      this.selectionChanged();
+      this.triggerSelectionChange();
     }
   }
 
@@ -474,15 +486,19 @@ export default class Api extends EventDispatcher {
     return Object.keys(this.selection).map(id => this.getElement(id)).filter(el => !!el);
   }
 
-  dataChanged() {
-    this.emit('dataChanged');
+  triggerDataChange() {
+    this.emit('dataChange');
   }
 
-  selectionChanged() {
-    this.emit('selectionChanged');
+  triggerSelectionChange() {
+    this.emit('selectionChange');
   }
 
-  historyChanged() {
-    this.emit('historyChanged');
+  triggerHistoryChange() {
+    this.emit('historyChange');
+  }
+
+  triggerFinishChange() {
+    this.emit('finishChange');
   }
 }

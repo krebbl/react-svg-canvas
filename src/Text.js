@@ -5,8 +5,9 @@ import Element from './Element';
 import TextEditor from './TextEditor';
 import EventListener from 'react-event-listener';
 import MobileTextEditor from './MobileTextEditor';
-const wrapProperties = ['text', 'fontSize', 'fontFamily', 'verticalAlign', 'lineHeight', 'textAnchor', 'width', 'padding', 'maxWidth'];
-const compareProps = wrapProperties.concat(['height', 'placeholder', 'placeholderFill', 'fill']);
+
+const wrapProperties = ['text', 'fontSize', 'fontFamily', 'verticalAlign', 'lineHeight', 'textAnchor', 'width', 'padding', 'maxWidth', 'maxHeight', 'height'];
+const compareProps = wrapProperties.concat(['bullets', 'padding', 'placeholder', 'placeholderFill', 'fill']);
 const isFirefox = bowser.firefox;
 const isMSIEdge = bowser.msie || bowser.msedge;
 const textStyle = {whiteSpace: isMSIEdge ? 'pre-wrap' : '', textRendering: 'geometricPrecision', userSelect: 'none', pointerEvents: 'none'};

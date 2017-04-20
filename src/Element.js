@@ -82,7 +82,7 @@ export default class Element extends React.Component {
       throw new Error('Canvas missing on context');
     }
 
-    context.api.on('selectionChanged', this.handleSelectionChange);
+    context.api.on('selectionChange', this.handleSelectionChange);
 
     this.state = {
       selected: !!context.api.isElementSelected(props.id)
@@ -103,8 +103,8 @@ export default class Element extends React.Component {
     this.context.api.updateElement(this.props.id, key, value);
   }
 
-  dataChanged() {
-    this.context.api.dataChanged();
+  triggerDataChange() {
+    this.context.api.triggerDataChange();
   }
 
   renderKnobs() {
@@ -204,7 +204,7 @@ export default class Element extends React.Component {
 
   componentWillUnmount() {
     this.context.api.unregisterNode(this);
-    this.context.api.off('selectionChanged', this.handleSelectionChange);
+    this.context.api.off('selectionChange', this.handleSelectionChange);
     this.context.canvas.unregisterNode(this);
   }
 
@@ -342,9 +342,9 @@ export default class Element extends React.Component {
         this.context.api.updateElement(this.props.id, key, val);
       }
       if (trigger) {
-        this.context.api.dataChanged();
+        this.context.api.triggerDataChange();
         if (this.state.selected) {
-          this.context.api.selectionChanged();
+          this.context.api.triggerSelectionChange();
         }
       }
     }

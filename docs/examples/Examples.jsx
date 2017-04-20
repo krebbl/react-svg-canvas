@@ -115,7 +115,7 @@ export default class Examples extends React.Component {
   constructor(props, context) {
     super(props, context);
 
-    api.on('selectionChanged', this.handleSelectionChanged);
+    api.on('selectionChange', this.handleSelectionChanged);
   }
 
   state = {
@@ -142,7 +142,7 @@ export default class Examples extends React.Component {
   };
 
   componentWillUnmount() {
-    api.unbind('selectionChanged', this.handleSelectionChanged);
+    api.unbind('selectionChange', this.handleSelectionChanged);
   }
 
   decreaseZoom = () => {
@@ -170,7 +170,7 @@ export default class Examples extends React.Component {
           const factory = api.getNode(element.id).constructor;
           return <div key={element.id}>
             <h6>{`${factory.name} / ${element.id}`}</h6>
-            {Object.keys(factory.propTypes).map((key) => {
+            {Object.keys(factory.propTypes || {}).map((key) => {
               if (key === 'id') {
                 return null;
               }

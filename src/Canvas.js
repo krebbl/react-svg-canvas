@@ -103,7 +103,7 @@ export default class Canvas extends React.Component {
       || prevState.slideTop !== this.state.slideTop
       || prevState.width !== this.state.width
       || prevState.height !== this.state.height) {
-      this.props.api.selectionChanged();
+      this.props.api.triggerSelectionChange();
       this.centerContent();
     }
   }

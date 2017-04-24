@@ -20,7 +20,9 @@ export default class Knob extends React.Component {
   };
 
   handleStartDrag = (e) => {
-    document.activeElement.blur();
+    this.activeElement = document.activeElement;
+    this.activeElement && this.activeElement.blur();
+
     e.nativeEvent.preventDefault();
     this.relativeStartPoint = e.relativeStartPoint;
     this.context.api.startChange();
@@ -35,6 +37,8 @@ export default class Knob extends React.Component {
   };
 
   handleDragEnd = (e) => {
+    this.activeElement && this.activeElement.focus();
+
     e.nativeEvent.stopPropagation();
     this.context.api.finishChange();
     this.props.onDone && this.props.onDone();

@@ -216,7 +216,7 @@ export default class Canvas extends React.Component {
 
   handleKeyDown = (e) => {
     const api = this.props.api;
-    if (!/input|textarea/gi.test(e.srcElement.tagName) && !e.srcElement.getAttribute('contenteditable')) {
+    if (!/input|textarea/gi.test(e.target.tagName) && !e.target.getAttribute('contenteditable')) {
       if (e.which === 8 || e.which === 46) {
         api.removeSelectedElements();
         api.triggerDataChange();

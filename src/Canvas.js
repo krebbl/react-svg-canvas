@@ -161,9 +161,8 @@ export default class Canvas extends React.Component {
       });
     });
 
-
-    this.possibleSnaplines.forEach((s) => {
-      s.ref.highlight(!!(matchedSnapline[s.mode] && matchedSnapline[s.mode].ref === s.ref));
+    this.possibleSnaplines.map(snapline => snapline.ref).filter((elem, pos, self) => self.indexOf(elem) === pos).forEach((element) => {
+      element.highlight(matchingSnaplines.find(s => s.ref === element));
     });
 
     this.setState({

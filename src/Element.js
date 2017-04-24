@@ -170,15 +170,18 @@ export default class Element extends React.Component {
   }
 
   componentDidUpdate(prevProps, prevState) {
-    const sizeChanged = this.state.bboxWidth !== prevState.bboxWidth
-      || this.state.bboxHeight !== prevState.bboxHeight
-      || this.state.bboxX !== prevState.bboxX
-      || this.state.bboxY !== prevState.bboxY;
-    if (sizeChanged) {
-      this.notifySizeChanged();
-    } else if (!shallowequal(prevProps, this.props)) {
+    if (!shallowequal(prevProps, this.props)) {
       this.applyTransformation(prevProps.rotate !== this.props.rotate
         || prevProps.x !== this.props.x || prevProps.y !== this.props.y);
+    } else {
+      const sizeChanged = this.state.bboxWidth !== prevState.bboxWidth
+        || this.state.bboxHeight !== prevState.bboxHeight
+        || this.state.bboxX !== prevState.bboxX
+        || this.state.bboxY !== prevState.bboxY;
+
+      if (sizeChanged) {
+        this.notifySizeChanged();
+      }
     }
 
     if (prevState.moving !== this.state.moving) {
@@ -229,8 +232,12 @@ export default class Element extends React.Component {
     }
   }
 
+  getBBoxNode() {
+    return this.contentNode;
+  }
+
   calcBBox() {
-    const node = this.contentNode;
+    const node = this.getBBoxNode();
     if (!node) return null;
     return node.getBBox();
   }
@@ -643,6 +650,13 @@ Element.createClass = function (RenderFactory, defaultElementProps) {
       super(props, context);
     }
 
+    getBBoxNode() {
+      if(this.renderInst.getBBoxNode) {
+        return this.renderInst.getBBoxNode();
+      }
+      return super.getBBoxNode();
+    }
+
     renderKnobs() {
       if (this.renderInst.renderKnobs) {
         const ret = this.renderInst.renderKnobs();
@@ -669,7 +683,8 @@ Element.createClass = function (RenderFactory, defaultElementProps) {
 
     renderChildren() {
       const Renderer = this.Renderer;
-      return <Renderer ref={this.handleRenderer} _wrapper={this} {...this.props} {...this.state} />;
+      const {bboxX, bboxY, bboxWidth, bboxHeight, ...otherState} = this.state;
+      return <Renderer ref={this.handleRenderer} _wrapper={this} {...this.props} {...otherState} />;
     }
   }
 

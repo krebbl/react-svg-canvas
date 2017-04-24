@@ -22,7 +22,7 @@ const WRAPPER_FONT_SIZE = 16;
 
 function positionTextNode(textNode, rect, textAnchor, innerWidth) {
   let x = rect.left;
-  const y = rect.top - Math.round(Math.min(0, textNode.getBBox().y));
+  const y = rect.top - Math.round(textNode.getBBox().y);
 
   if (!isMSIEdge) {
     textNode.setAttributeNS(null, 'text-anchor', textAnchor);
@@ -148,6 +148,10 @@ export class TextRenderer extends React.Component {
     }
 
     this.textEditor && this.textEditor.repositionTextArea();
+  }
+
+  getBBoxNode() {
+    return this.textBBoxNode;
   }
 
   svgRoot() {
@@ -375,6 +379,10 @@ export class TextRenderer extends React.Component {
     this.node = ref;
   };
 
+  handleTextBBox = (ref) => {
+    this.textBBoxNode = ref;
+  };
+
   render() {
     const measurement = this.state.measurement;
     const rects = measurement.rects;
@@ -427,9 +435,10 @@ export class TextRenderer extends React.Component {
       onTouchEnd={this.handleTextUp}
     >
       <EventListener target="window" onKeyPress={this.handleKeyPress}/>
-      {<g ref={this.handleTextBBox}>
+      {<g>
         <rect
-          transform={`translate(${x}, 0)`}
+          ref={this.handleTextBBox}
+          x={x}
           width={this.props.width || (measurement.width)}
           height={measurement.height}
           fill={this.props.background}

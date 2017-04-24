@@ -22,7 +22,8 @@ const WRAPPER_FONT_SIZE = 16;
 
 function positionTextNode(textNode, rect, textAnchor, innerWidth) {
   let x = rect.left;
-  const y = rect.top - Math.round(textNode.getBBox().y);
+
+  const y = rect.top - Math.round(textNode.getBBox().y) + rect.height - textNode.getBBox().height;
 
   if (!isMSIEdge) {
     textNode.setAttributeNS(null, 'text-anchor', textAnchor);
@@ -117,11 +118,8 @@ export class TextRenderer extends React.Component {
         break;
       }
     }
-  }
-
-  componentWillUpdate(nextProps, nextState) {
-    if (!nextProps.selected) {
-      nextState.editing = false;
+    if(!nextProps.selected) {
+      this.setState({editing: false});
     }
   }
 
@@ -159,8 +157,9 @@ export class TextRenderer extends React.Component {
   }
 
   wrapText() {
-    const rects = this.state.measurement.rects;
-    const baseline = this.state.measurement.baseline;
+    const measurement = this.state.measurement;
+    const rects = measurement.rects;
+    const baseline = measurement.baseline;
     let textContent = this.props.text || this.props.placeholder;
     const svgRoot = this.svgRoot();
     const p = svgRoot.createSVGPoint();
@@ -445,8 +444,8 @@ export class TextRenderer extends React.Component {
         />
       </g>}
       {<g transform={`translate(${tx}, 0)`}>
-        <g>
-          {isDebug ? rects.map((line, i) => {
+        {isDebug ? <g transform={`scale(${this.props.fontSize / WRAPPER_FONT_SIZE})`}>
+          {rects.map((line, i) => {
             return <rect
               key={`${i}'_'${line.left}`}
               width={line.width} height={line.height}
@@ -454,8 +453,8 @@ export class TextRenderer extends React.Component {
               y={line.top}
               fill="green"
             />;
-          }) : null}
-        </g>
+          })}
+        </g> : null}
         <g ref={this.handleTextWrapperRef} transform={`scale(${this.props.fontSize / WRAPPER_FONT_SIZE})`}>
           {rects.map((line, i) => {
             return <text

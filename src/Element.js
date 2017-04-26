@@ -592,7 +592,7 @@ export default class Element extends React.Component {
   };
 
   render() {
-    const {selectable} = this.props;
+    const {selectable, className, onClick} = this.props;
     const transform = this.calcTransform(this.props.x, this.props.y,
       (this.props.width || 0),
       (this.props.height || 0),
@@ -604,12 +604,13 @@ export default class Element extends React.Component {
     return (
       <g
         ref={this.handleRef}
-        className={`element element-${this.type}`}
+        className={`element element-${this.type} ${className}`}
         transform={transform}
         onMouseDown={this.handleMouseDown}
         onTouchStart={this.handleMouseDown}
         onMouseOver={this.handleMouseEnter}
         onMouseOut={this.handleMouseOut}
+        onClick={onClick}
       >
         {selectable ? <g ref={this.handleBBoxRef} transform={`translate(${this.state.bboxX || 0}, ${this.state.bboxY || 0})`}>
           <rect

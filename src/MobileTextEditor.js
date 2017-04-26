@@ -17,13 +17,12 @@ export default class MobileTextEditor extends TextEditor {
       this._wrapper = document.createElement('div');
       const wrapperStyle = this._wrapper.style;
       wrapperStyle.position = 'absolute';
-      wrapperStyle.position = 'absolute';
       wrapperStyle.top = '0';
       wrapperStyle.left = '0';
       wrapperStyle.right = '0';
       wrapperStyle.bottom = '0';
       wrapperStyle.background = isDark ? 'rgba(255,255,255,0.9)' : 'rgba(0,0,0,0.9)';
-      wrapperStyle.padding = `30px ${sidePadding}px 0`;
+      wrapperStyle.padding = `60px ${sidePadding}px 0`;
       wrapperStyle.zIndex = '9999';
 
       this._target = document.createElement('div');
@@ -44,6 +43,14 @@ export default class MobileTextEditor extends TextEditor {
       style.color = this.props.fill;
       this._target.setAttribute('contenteditable', 'true');
 
+      this._okButton = document.createElement('div');
+      this._okButton.className = `element-text-button-ok ${isDark ? '' : 'dark'}`;
+
+      this._okButton.onclick = function() {
+          document.activeElement.blur();
+      };
+
+      this._wrapper.appendChild(this._okButton);
       this._wrapper.appendChild(this._target);
 
       document.body.appendChild(this._wrapper);

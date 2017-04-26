@@ -7,7 +7,7 @@ import EventListener from 'react-event-listener';
 import MobileTextEditor from './MobileTextEditor';
 
 const wrapProperties = ['text', 'fontSize', 'fontFamily', 'verticalAlign', 'lineHeight', 'textAnchor', 'width', 'padding', 'maxWidth', 'maxHeight', 'height'];
-const compareProps = wrapProperties.concat(['bullets', 'padding', 'placeholder', 'placeholderFill', 'fill']);
+const compareProps = wrapProperties.concat(['bullets', 'padding', 'placeholder', 'placeholderFill', 'fill', 'selected']);
 const isFirefox = bowser.firefox;
 const isMSIEdge = bowser.msie || bowser.msedge;
 const textStyle = {whiteSpace: isMSIEdge ? 'pre-wrap' : '', textRendering: 'geometricPrecision', userSelect: 'none', pointerEvents: 'none'};
@@ -23,7 +23,7 @@ const WRAPPER_FONT_SIZE = 16;
 function positionTextNode(textNode, rect, textAnchor, innerWidth) {
   let x = rect.left;
 
-  const y = rect.top - Math.round(textNode.getBBox().y) + rect.height - textNode.getBBox().height;
+  const y = rect.top - Math.round(textNode.getBBox().y) + Math.round(rect.height) - textNode.getBBox().height;
 
   if (!isMSIEdge) {
     textNode.setAttributeNS(null, 'text-anchor', textAnchor);
@@ -118,7 +118,7 @@ export class TextRenderer extends React.Component {
         break;
       }
     }
-    if(!nextProps.selected) {
+    if (!nextProps.selected) {
       this.setState({editing: false});
     }
   }
@@ -288,7 +288,7 @@ export class TextRenderer extends React.Component {
       const maxWidth = this.props.maxWidth ? this.props.maxWidth - 0.01 : null;
       const width = this.props.width ? (this.props.width) - 0.01 : null;
 
-      if(this.props.useMobileEditor) {
+      if (this.props.useMobileEditor) {
         return <MobileTextEditor {...props}
                                  key={this.props.id}
                                  ref={this.handeTextEditor}
@@ -346,12 +346,19 @@ export class TextRenderer extends React.Component {
     if (!this.props.editable) {
       return;
     }
-    if (this.state.editing) {
-      e.stopPropagation();
+    if(this.props.selected) {
+
+      if (this.state.editing) {
+        e.stopPropagation();
+      }
+
+      if (this.props.editable && this.props.selected) {
+        this.textDownTime = e.timeStamp;
+      } else {
+        this.textDownTime = 0;
+      }
     }
-    if (this.props.editable && this.props.selected) {
-      this.textDownTime = e.timeStamp;
-    }
+
   };
 
   handleTextUp = (e) => {
@@ -428,8 +435,8 @@ export class TextRenderer extends React.Component {
     return (<g
       ref={this.handleNode}
       transform={`translate(0, ${y})`}
-      onTouchStart={this.handleTextDown}
       onMouseDown={this.handleTextDown}
+      onTouchStart={this.handleTextDown}
       onMouseUp={this.handleTextUp}
       onTouchEnd={this.handleTextUp}
     >

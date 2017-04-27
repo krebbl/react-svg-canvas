@@ -109,11 +109,9 @@ export default class Canvas extends React.Component {
   }
 
   centerContent() {
-    if (this.props.fixed) {
-      const bbox = this.svgRoot.parentNode.getBoundingClientRect();
-      this.wrapperNode.scrollLeft = (this.state.width - bbox.width) * 0.5;
-      this.wrapperNode.scrollTop = (this.state.height - bbox.height) * 0.5;
-    }
+    const bbox = this.svgRoot.parentNode.getBoundingClientRect();
+    this.wrapperNode.scrollLeft = (this.state.width - bbox.width) * 0.5;
+    this.wrapperNode.scrollTop = (this.state.height - bbox.height) * 0.5;
   }
 
   positionSlide() {

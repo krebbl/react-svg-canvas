@@ -616,14 +616,14 @@ export default class Element extends React.Component {
   }
 
   notifySizeChanged() {
-    this.context.api.updateSelection(this);
+    this.context.api.updateSelection(this.props.id);
     this.props.onSizeChange && this.props.onSizeChange(this);
     this.context.group && this.context.group.childSizeChanged();
   }
 
   // For parent elements
   notifyPositionChanged() {
-    this.context.api.updateSelection(this);
+    this.context.api.updateSelection(this.props.id);
   }
 
   handleBBoxRef = (ref) => {

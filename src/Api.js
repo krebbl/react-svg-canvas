@@ -233,7 +233,7 @@ export default class Api extends EventDispatcher {
 
   getChildren(id, deep) {
     const element = this.getElement(id);
-    if(!element) {
+    if (!element) {
       return [];
     }
     let children = [];
@@ -470,10 +470,9 @@ export default class Api extends EventDispatcher {
     }
   }
 
-  updateSelection(node) {
-    if (this.isNodeSelected(node)) {
-      this.selection = this.selection.set(node.props.id, true);
-      this.nodes[node.props.id] = node;
+  updateSelection(id) {
+    if (this.selection[id]) {
+      this.selection = this.selection.set(id, true);
       this.triggerSelectionChange();
     }
   }
@@ -483,7 +482,7 @@ export default class Api extends EventDispatcher {
   }
 
   getSelectedElements() {
-    return Object.keys(this.selection).map(id => this.getElement(id)).filter(el => !!el);
+    return Object.keys(this.selection).map(id => this.getElement(id)).filter(el => !!el).filter(el => !!this.nodes[el.id]);
   }
 
   triggerDataChange() {

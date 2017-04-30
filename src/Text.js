@@ -135,7 +135,7 @@ export class TextRenderer extends React.Component {
     }
 
     if (this.state.editing !== prevState.editing) {
-      this.context.api.updateSelection(this);
+      this.context.api.updateSelection(this.props.id);
       if (!this.state.editing) {
         this.context.api.finishChange();
         this.textEditor && this.textEditor.deactivate();

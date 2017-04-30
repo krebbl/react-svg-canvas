@@ -200,7 +200,7 @@ export default class Element extends React.Component {
       x: minX,
       y: minY,
       width: maxX - minX,
-      height: maxY - maxY
+      height: maxY - minY
     };
   };
 

@@ -292,8 +292,12 @@ export default class Canvas extends React.Component {
     const wrapperStyle = {width: '100%', height: '100%', overflow: this.props.fixed ? 'hidden' : 'auto', position: 'absolute'};
 
     return (<div style={wrapperStyle} ref={this.handleWrapperRef} tabIndex="-1">
-      <EventListener target="window" onResize={this.handleResize}/>
-      <EventListener target="window" onKeyDown={this.handleKeyDown}/>
+      <EventListener
+        target="window"
+        onResize={this.handleResize}
+        onOrientationChange={this.handleResize}
+        onKeyDown={this.handleKeyDown}
+      />
       <svg
         xmlns="http://www.w3.org/2000/svg" version="1.1"
         width={this.state.width || '100%'} height={this.state.height || '100%'}

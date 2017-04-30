@@ -434,7 +434,7 @@ export default class Element extends React.Component {
       this.moved = p.x !== this.startPoint.x || p.y !== this.startPoint.y;
       let newX = this.startX + (p.x - this.startPoint.x);
       let newY = this.startY + (p.y - this.startPoint.y);
-      const diffs = this.context.canvas.findSnaplines(this, this.createSnaplines(newX + (this.state.bboxX || 0), newY + (this.state.bboxY || 0), this.actualWidth(), this.actualHeight(), this.props.rotate));
+      const diffs = this.context.canvas.findSnaplines(this, this.createSnaplines(newX, newY, (this.state.bboxX || 0), (this.state.bboxY || 0), this.actualWidth(), this.actualHeight(), this.props.rotate));
       if (diffs.x || diffs.y) {
         const inverseMatrix = this.context.canvas.slideNode.getCTM();
         const parentCtm = this.node.parentNode.getCTM().inverse();
@@ -504,7 +504,7 @@ export default class Element extends React.Component {
     return false;
   }
 
-  createSnaplines(x, y, width, height, rotation) {
+  createSnaplines(x, y, bboxX, bboxY, width, height, rotation) {
     const snaplines = [];
     if (!this.props.snapable) {
       return snaplines;
@@ -517,51 +517,65 @@ export default class Element extends React.Component {
     const inverseMatrix = this.context.canvas.slideNode.getCTM().inverse();
     const parentCtm = this.node.parentNode.getCTM();
     const multiplied = inverseMatrix.multiply(parentCtm);
-    pt = pt.matrixTransform(multiplied);
-    pw.x = x + width;
-    pw.y = y + height;
-    pw = pw.matrixTransform(multiplied);
-    const w = pw.x - pt.x;
-    const h = pw.y - pt.y;
+    const transform = svgRoot.createSVGTransform();
+    transform.setRotate(rotation, 0, 0);
+    const xValues = [bboxX, bboxX + width];
+    const yValues = [bboxY, bboxY + height];
+    let maxX = -Infinity;
+    let minX = Infinity;
+    let maxY = -Infinity;
+    let minY = Infinity;
 
-    snaplines.push({
-      pos: pt.x + (w * 0.5),
-      mode: 'x',
-      ref: this
-    });
-    if (!rotation) {
-      snaplines.push({
-        pos: pt.x,
-        mode: 'x',
-        ref: this
-      });
+    for (let i = 0; i < xValues.length; i++) {
+      for (let j = 0; j < yValues.length; j++) {
+        pw.x = xValues[i] - (this.props.width || 0) * 0.5;
+        pw.y = yValues[j] - (this.props.height || 0) * 0.5;
+        pw = pw.matrixTransform(transform.matrix);
+        pw.x = x + pw.x;
+        pw.y = y + pw.y;
+        pw = pw.matrixTransform(multiplied);
+        maxX = Math.max(maxX, pw.x);
+        minX = Math.min(minX, pw.x);
+        maxY = Math.max(maxY, pw.y);
+        minY = Math.min(minY, pw.y);
+      }
 
-      snaplines.push({
-        pos: pt.x + w,
-        mode: 'x',
-        ref: this
-      });
     }
 
     snaplines.push({
-      pos: pt.y + (h * 0.5),
+      pos: minX,
+      mode: 'x',
+      ref: this
+    });
+    snaplines.push({
+      pos: maxX,
+      mode: 'x',
+      ref: this
+    });
+
+    snaplines.push({
+      pos: minX + (maxX - minX) * 0.5,
+      mode: 'x',
+      ref: this
+    });
+
+    snaplines.push({
+      pos: minY,
       mode: 'y',
       ref: this
     });
 
-    if (!rotation) {
-      snaplines.push({
-        pos: pt.y,
-        mode: 'y',
-        ref: this
-      });
+    snaplines.push({
+      pos: maxY,
+      mode: 'y',
+      ref: this
+    });
 
-      snaplines.push({
-        pos: pt.y + h,
-        mode: 'y',
-        ref: this
-      });
-    }
+    snaplines.push({
+      pos: minY + (maxY - minY) * 0.5,
+      mode: 'y',
+      ref: this
+    });
 
     // TODO: add snaplines created by renderer
 
@@ -573,7 +587,7 @@ export default class Element extends React.Component {
   }
 
   getCurrentSnaplines() {
-    return this.createSnaplines(this.props.x + (this.state.bboxX || 0), this.props.y + (this.state.bboxY || 0), this.actualWidth(), this.actualHeight());
+    return this.createSnaplines(this.props.x, this.props.y, (this.state.bboxX || 0), (this.state.bboxY || 0), this.actualWidth(), this.actualHeight(), this.props.rotate);
   }
 
   notifySizeChanged() {

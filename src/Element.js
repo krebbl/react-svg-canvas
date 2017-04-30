@@ -169,6 +169,45 @@ export default class Element extends React.Component {
     return this.props.children;
   }
 
+  calcOuterBBox(x, y, bboxX, bboxY, width, height, rotation) {
+    const svgRoot = this.svgRoot();
+    let pw = svgRoot.createSVGPoint();
+    const transform = svgRoot.createSVGTransform();
+    transform.setRotate(rotation, 0, 0);
+    const xValues = [bboxX, bboxX + width];
+    const yValues = [bboxY, bboxY + height];
+    let maxX = -Infinity;
+    let minX = Infinity;
+    let maxY = -Infinity;
+    let minY = Infinity;
+
+    for (let i = 0; i < xValues.length; i++) {
+      for (let j = 0; j < yValues.length; j++) {
+        pw.x = xValues[i] - (this.props.width || 0) * (0.5 - this.props.anchorX);
+        pw.y = yValues[j] - (this.props.height || 0) * (0.5 - this.props.anchorY);
+        pw = pw.matrixTransform(transform.matrix);
+        pw.x = x + (this.props.width || 0) * (0.5 - this.props.anchorX) + pw.x;
+        pw.y = y + (this.props.height || 0) * (0.5 - this.props.anchorY) + pw.y;
+        maxX = Math.max(maxX, pw.x);
+        minX = Math.min(minX, pw.x);
+        maxY = Math.max(maxY, pw.y);
+        minY = Math.min(minY, pw.y);
+      }
+
+    }
+
+    return {
+      x: minX,
+      y: minY,
+      width: maxX - minX,
+      height: maxY - maxY
+    };
+  };
+
+  getOuterBBox() {
+    return this.calcOuterBBox(this.props.x, this.props.y, this.state.bboxX || 0, this.state.bboxY || 0, this.actualWidth(), this.actualHeight(), this.props.rotate);
+  }
+
   componentDidUpdate(prevProps, prevState) {
     let bboxChanged = false;
     if (!shallowequal(prevProps, this.props) || this.state.selected !== prevState.selected) {
@@ -513,69 +552,52 @@ export default class Element extends React.Component {
       return snaplines;
     }
     const svgRoot = this.svgRoot();
-    let pt = svgRoot.createSVGPoint();
-    let pw = svgRoot.createSVGPoint();
-    pt.x = x;
-    pt.y = y;
+    let lt = svgRoot.createSVGPoint();
+    let rb = svgRoot.createSVGPoint();
     const inverseMatrix = this.context.canvas.slideNode.getCTM().inverse();
     const parentCtm = this.node.parentNode.getCTM();
     const multiplied = inverseMatrix.multiply(parentCtm);
-    const transform = svgRoot.createSVGTransform();
-    transform.setRotate(rotation, 0, 0);
-    const xValues = [bboxX, bboxX + width];
-    const yValues = [bboxY, bboxY + height];
-    let maxX = -Infinity;
-    let minX = Infinity;
-    let maxY = -Infinity;
-    let minY = Infinity;
 
-    for (let i = 0; i < xValues.length; i++) {
-      for (let j = 0; j < yValues.length; j++) {
-        pw.x = xValues[i] - (this.props.width || 0) * (0.5 - this.props.anchorX);
-        pw.y = yValues[j] - (this.props.height || 0) * (0.5 - this.props.anchorY);
-        pw = pw.matrixTransform(transform.matrix);
-        pw.x = x + (this.props.width || 0) * (0.5 - this.props.anchorX) + pw.x;
-        pw.y = y + (this.props.height || 0) * (0.5 - this.props.anchorY) + pw.y;
-        pw = pw.matrixTransform(multiplied);
-        maxX = Math.max(maxX, pw.x);
-        minX = Math.min(minX, pw.x);
-        maxY = Math.max(maxY, pw.y);
-        minY = Math.min(minY, pw.y);
-      }
+    const outerBBox = this.calcOuterBBox(x, y, bboxX, bboxY, width, height, rotation);
+    lt.x = outerBBox.x;
+    lt.y = outerBBox.y;
+    lt = lt.matrixTransform(multiplied);
 
-    }
+    rb.x = outerBBox.x + outerBBox.width;
+    rb.y = outerBBox.y + outerBBox.height;
+    rb = rb.matrixTransform(multiplied);
 
     snaplines.push({
-      pos: minX,
+      pos: lt.x,
       mode: 'x',
       ref: this
     });
     snaplines.push({
-      pos: maxX,
+      pos: lt.x + (rb.x - lt.x),
       mode: 'x',
       ref: this
     });
 
     snaplines.push({
-      pos: minX + (maxX - minX) * 0.5,
+      pos: lt.x + (rb.x - lt.x) * 0.5,
       mode: 'x',
       ref: this
     });
 
     snaplines.push({
-      pos: minY,
+      pos: lt.y,
       mode: 'y',
       ref: this
     });
 
     snaplines.push({
-      pos: maxY,
+      pos: lt.y + (rb.y - lt.y),
       mode: 'y',
       ref: this
     });
 
     snaplines.push({
-      pos: minY + (maxY - minY) * 0.5,
+      pos: lt.y + (rb.y - lt.y) * 0.5,
       mode: 'y',
       ref: this
     });

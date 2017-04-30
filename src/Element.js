@@ -170,15 +170,16 @@ export default class Element extends React.Component {
   }
 
   componentDidUpdate(prevProps, prevState) {
-    if (!shallowequal(prevProps, this.props)) {
-      this.applyTransformation(prevProps.rotate !== this.props.rotate
+    let bboxChanged = false;
+    if (!shallowequal(prevProps, this.props) || this.state.selected !== prevState.selected) {
+      bboxChanged = this.applyTransformation(prevProps.rotate !== this.props.rotate
         || prevProps.x !== this.props.x || prevProps.y !== this.props.y);
-    } else {
+    }
+    if (!bboxChanged) {
       const sizeChanged = this.state.bboxWidth !== prevState.bboxWidth
         || this.state.bboxHeight !== prevState.bboxHeight
         || this.state.bboxX !== prevState.bboxX
         || this.state.bboxY !== prevState.bboxY;
-
       if (sizeChanged) {
         this.notifySizeChanged();
       }
@@ -227,9 +228,11 @@ export default class Element extends React.Component {
         bboxWidth,
         bboxHeight
       });
+      return true;
     } else if (positionChanged) {
       this.notifySizeChanged();
     }
+    return false;
   }
 
   getBBoxNode() {
@@ -666,7 +669,7 @@ Element.createClass = function (RenderFactory, defaultElementProps) {
     }
 
     getBBoxNode() {
-      if(this.renderInst.getBBoxNode) {
+      if (this.renderInst.getBBoxNode) {
         return this.renderInst.getBBoxNode();
       }
       return super.getBBoxNode();

@@ -528,11 +528,11 @@ export default class Element extends React.Component {
 
     for (let i = 0; i < xValues.length; i++) {
       for (let j = 0; j < yValues.length; j++) {
-        pw.x = xValues[i] - (this.props.width || 0) * 0.5;
-        pw.y = yValues[j] - (this.props.height || 0) * 0.5;
+        pw.x = xValues[i] - (this.props.width || 0) * (0.5 - this.props.anchorX);
+        pw.y = yValues[j] - (this.props.height || 0) * (0.5 - this.props.anchorY);
         pw = pw.matrixTransform(transform.matrix);
-        pw.x = x + pw.x;
-        pw.y = y + pw.y;
+        pw.x = x + (this.props.width || 0) * (0.5 - this.props.anchorX) + pw.x;
+        pw.y = y + (this.props.height || 0) * (0.5 - this.props.anchorY) + pw.y;
         pw = pw.matrixTransform(multiplied);
         maxX = Math.max(maxX, pw.x);
         minX = Math.min(minX, pw.x);

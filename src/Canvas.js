@@ -2,6 +2,8 @@ import React, {PropTypes} from 'react';
 import EventListener from 'react-event-listener';
 import Api from './Api';
 
+const snapLinesStyle = {pointerEvents: 'none'};
+
 export default class Canvas extends React.Component {
 
   static propTypes = {
@@ -317,7 +319,7 @@ export default class Canvas extends React.Component {
                 return React.createElement(factory, {key: id, id, ...other});
               })}
             </g>
-            <g className="snaplines">
+            <g className="snaplines" style={snapLinesStyle}>
               {(this.state.snaplines || []).map((snapline, i) => {
                 if (snapline.mode === 'x') {
                   return <line key={i} vectorEffect="non-scaling-stroke" strokeDasharray="5 5" stroke="blue" strokeWidth="0.8" y1={0} y2={this.state.slide.height} x1={snapline.pos} x2={snapline.pos}/>

@@ -572,14 +572,15 @@ export default class Element extends React.Component {
       mode: 'x',
       ref: this
     });
+
     snaplines.push({
-      pos: lt.x + (rb.x - lt.x),
+      pos: lt.x + (rb.x - lt.x) * 0.5,
       mode: 'x',
       ref: this
     });
 
     snaplines.push({
-      pos: lt.x + (rb.x - lt.x) * 0.5,
+      pos: lt.x + (rb.x - lt.x),
       mode: 'x',
       ref: this
     });
@@ -591,16 +592,18 @@ export default class Element extends React.Component {
     });
 
     snaplines.push({
-      pos: lt.y + (rb.y - lt.y),
+      pos: lt.y + (rb.y - lt.y) * 0.5,
       mode: 'y',
       ref: this
     });
 
     snaplines.push({
-      pos: lt.y + (rb.y - lt.y) * 0.5,
+      pos: lt.y + (rb.y - lt.y),
       mode: 'y',
       ref: this
     });
+
+
 
     // TODO: add snaplines created by renderer
 

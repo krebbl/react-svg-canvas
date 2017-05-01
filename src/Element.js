@@ -25,6 +25,7 @@ export default class Element extends React.Component {
     width: PropTypes.number,
     height: PropTypes.number,
     rotate: PropTypes.number,
+    className: PropTypes.string,
     children: PropTypes.node,
     movable: PropTypes.bool,
     moveDelegate: PropTypes.instanceOf(Element),
@@ -42,6 +43,7 @@ export default class Element extends React.Component {
     anchorX: 0,
     anchorY: 0,
     rotate: 0,
+    className: '',
     selectable: true,
     scalable: true,
     snapable: true,
@@ -646,7 +648,7 @@ export default class Element extends React.Component {
     return (
       <g
         ref={this.handleRef}
-        className={`element element-${this.type} ${className}`}
+        className={`element element-${this.props.type} ${className || ''}`}
         transform={transform}
         onMouseDown={this.handleMouseDown}
         onTouchStart={this.handleMouseDown}

@@ -53,6 +53,7 @@ export class TextRenderer extends React.Component {
     verticalAlign: 'top',
     lineHeight: 1.3,
     textAnchor: 'start',
+    removeEmpty: false,
     fill: 'black',
     editable: true,
     background: 'transparent',
@@ -66,6 +67,7 @@ export class TextRenderer extends React.Component {
     fontFamily: PropTypes.string,
     fontSize: PropTypes.number,
     text: PropTypes.string,
+    removeEmpty: PropTypes.bool,
     textAnchor: PropTypes.oneOf(['start', 'middle', 'end']),
     maxWidth: PropTypes.number,
     lineHeight: PropTypes.number,
@@ -138,6 +140,9 @@ export class TextRenderer extends React.Component {
     if (this.state.editing !== prevState.editing) {
       this.context.api.updateSelection(this.props.id);
       if (!this.state.editing) {
+        if(this.props.removeEmpty) {
+           this.context.api.removeElement(this.props.id);
+        }
         this.context.api.finishChange();
         this.textEditor && this.textEditor.deactivate();
       } else {

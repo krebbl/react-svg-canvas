@@ -84,9 +84,10 @@ export class TextRenderer extends React.Component {
 
   measureText(props, withoutRects) {
     const scaleFactor = WRAPPER_FONT_SIZE / props.fontSize;
+    const isEditing = this.state && this.state.editing;
     const options = Object.assign({}, props, {
       fontSize: WRAPPER_FONT_SIZE,
-      text: props.text || (!this.state.editing ? props.placeholder : ' '),
+      text: props.text || (!isEditing ? props.placeholder : ' '),
       width: (props.width ? props.width : 0) * scaleFactor,
       maxWidth: (props.maxWidth ? props.maxWidth : 0) * scaleFactor,
       textAlign: textAlignMap[props.textAnchor]

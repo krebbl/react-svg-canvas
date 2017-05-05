@@ -25,18 +25,16 @@ function positionTextNode(textNode, rect, textAnchor, innerWidth) {
 
   const y = rect.top - Math.round(textNode.getBBox().y) + Math.round(rect.height) - textNode.getBBox().height;
 
-  if (!isMSIEdge) {
-    textNode.setAttributeNS(null, 'text-anchor', textAnchor);
-    switch (textAnchor) {
-      case 'middle':
-        x = innerWidth * 0.5;
-        break;
-      case 'end':
-        x = innerWidth;
-        break;
-      default:
-        break;
-    }
+  textNode.setAttributeNS(null, 'text-anchor', textAnchor);
+  switch (textAnchor) {
+    case 'middle':
+      x = innerWidth * 0.5;
+      break;
+    case 'end':
+      x = innerWidth;
+      break;
+    default:
+      break;
   }
   textNode.setAttributeNS(null, 'x', `${x}`);
   textNode.setAttributeNS(null, 'y', `${y}`);
@@ -132,10 +130,6 @@ export class TextRenderer extends React.Component {
 
   componentDidUpdate(prevProps, prevState) {
     this.wrapText();
-
-    if (!prevProps.selected && this.props.selected) {
-      this.node.focus();
-    }
 
     if (this.state.editing !== prevState.editing) {
       this.context.api.updateSelection(this.props.id);

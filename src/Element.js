@@ -245,12 +245,22 @@ export default class Element extends React.Component {
     if (this.state.selected) {
       this.context.canvas.focus();
     }
+
+    if (this.node) {
+      this.node.addEventListener('mousedown', this.handleMouseDown);
+      this.node.addEventListener('touchstart', this.handleMouseDown);
+    }
   }
 
   componentWillUnmount() {
     this.context.api.unregisterNode(this);
     this.context.api.off('selectionChange', this.handleSelectionChange);
     this.context.canvas.unregisterNode(this);
+
+    if (this.node) {
+      this.node.removeEventListener('mousedown', this.handleMouseDown);
+      this.node.removeEventListener('touchstart', this.handleMouseDown);
+    }
   }
 
   applyTransformation(positionChanged) {
@@ -431,8 +441,7 @@ export default class Element extends React.Component {
     // e.preventDefault();
     e.stopPropagation();
     const svgRoot = this.svgRoot();
-    let event = e.nativeEvent;
-    event = event.touches ? event.touches[0] : event;
+    let event = e.touches ? e.touches[0] : e;
     const pt = svgRoot.createSVGPoint();
     pt.x = event.clientX;
     pt.y = event.clientY;
@@ -650,8 +659,6 @@ export default class Element extends React.Component {
         ref={this.handleRef}
         className={`element element-${this.props.type} ${className || ''}`}
         transform={transform}
-        onMouseDown={this.handleMouseDown}
-        onTouchStart={this.handleMouseDown}
         onMouseOver={this.handleMouseEnter}
         onMouseOut={this.handleMouseOut}
         onClick={onClick}

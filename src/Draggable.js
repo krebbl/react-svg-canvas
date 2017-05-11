@@ -12,6 +12,19 @@ export default class Draggable extends React.Component {
 
   componentDidMount() {
     this.svgRoot = this.node.ownerSVGElement;
+
+    if (this.node) {
+      const {onDrag} = this.props;
+      this.node.addEventListener('mousedown', onDrag ? this.onTouchStart : null);
+      this.node.addEventListener('touchstart', onDrag ? this.onTouchStart : null);
+    }
+  }
+
+  componentWillUnmount() {
+    if (this.node) {
+      this.node.removeEventListener('mousedown', this.onTouchStart);
+      this.node.removeEventListener('touchstart', this.onTouchStart);
+    }
   }
 
   onTouchStart = (e) => {
@@ -29,7 +42,7 @@ export default class Draggable extends React.Component {
       target: this,
       startPoint: this.startPoint,
       relativeStartPoint: this.relativeStartPoint,
-      nativeEvent: e.nativeEvent
+      nativeEvent: e
     });
 
     window.addEventListener('mousemove', this.onTouchMove);
@@ -99,12 +112,7 @@ export default class Draggable extends React.Component {
   };
 
   render() {
-    const {onDrag} = this.props;
-    return (<g
-      ref={this.handleRef}
-      onMouseDown={onDrag ? this.onTouchStart : null}
-      onTouchStart={onDrag ? this.onTouchStart : null}
-    >
+    return (<g ref={this.handleRef}>
       {this.props.children}
     </g>);
   }

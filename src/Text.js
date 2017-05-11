@@ -126,6 +126,21 @@ export class TextRenderer extends React.Component {
 
   componentDidMount() {
     this.wrapText();
+    if (this.node) {
+      this.node.addEventListener('touchstart', this.handleTextDown);
+      this.node.addEventListener('mousedown', this.handleTextDown);
+      this.node.addEventListener('mouseup', this.handleTextUp);
+      this.node.addEventListener('touchend', this.handleTextUp);
+    }
+  }
+
+  componentWillUnmount() {
+    if (this.node) {
+      this.node.removeEventListener('touchstart', this.handleTextDown);
+      this.node.removeEventListener('mousedown', this.handleTextDown);
+      this.node.removeEventListener('mouseup', this.handleTextUp);
+      this.node.removeEventListener('touchend', this.handleTextUp);
+    }
   }
 
   componentDidUpdate(prevProps, prevState) {
@@ -134,8 +149,8 @@ export class TextRenderer extends React.Component {
     if (this.state.editing !== prevState.editing) {
       this.context.api.updateSelection(this.props.id);
       if (!this.state.editing) {
-        if(this.props.removeEmpty && !this.props.text) {
-           this.context.api.removeElement(this.props.id);
+        if (this.props.removeEmpty && !this.props.text) {
+          this.context.api.removeElement(this.props.id);
         }
         this.context.api.finishChange();
         this.textEditor && this.textEditor.deactivate();
@@ -346,7 +361,7 @@ export class TextRenderer extends React.Component {
     if (!this.props.editable) {
       return;
     }
-    if(this.props.selected) {
+    if (this.props.selected) {
 
       if (this.state.editing) {
         e.stopPropagation();
@@ -435,10 +450,6 @@ export class TextRenderer extends React.Component {
     return (<g
       ref={this.handleNode}
       transform={`translate(0, ${y})`}
-      onMouseDown={this.handleTextDown}
-      onTouchStart={this.handleTextDown}
-      onMouseUp={this.handleTextUp}
-      onTouchEnd={this.handleTextUp}
     >
       <EventListener target="window" onKeyPress={this.handleKeyPress}/>
       {<g>

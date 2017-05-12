@@ -1,5 +1,6 @@
 import React, {PropTypes} from 'react';
 import EventListener from 'react-event-listener';
+import bowser from 'bowser';
 import Api from './Api';
 
 const snapLinesStyle = {pointerEvents: 'none'};
@@ -203,7 +204,9 @@ export default class Canvas extends React.Component {
   }
 
   focus() {
-    this.wrapperNode && this.wrapperNode.focus();
+    if (!bowser.ios) {
+      this.wrapperNode && this.wrapperNode.focus();
+    }
   }
 
   handleResize = () => {

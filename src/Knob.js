@@ -1,4 +1,5 @@
 import React, {PropTypes} from 'react';
+import bowser from 'bowser';
 import Draggable from './Draggable';
 
 export default class Knob extends React.Component {
@@ -20,8 +21,10 @@ export default class Knob extends React.Component {
   };
 
   handleStartDrag = (e) => {
-    this.activeElement = document.activeElement;
-    this.activeElement && this.activeElement.blur();
+    if (!bowser.ios) {
+      this.activeElement = document.activeElement;
+      this.activeElement && this.activeElement.blur();
+    }
 
     e.nativeEvent.preventDefault();
     this.relativeStartPoint = e.relativeStartPoint;
@@ -37,7 +40,9 @@ export default class Knob extends React.Component {
   };
 
   handleDragEnd = (e) => {
-    this.activeElement && this.activeElement.focus();
+    if (!bowser.ios) {
+      this.activeElement && this.activeElement.focus();
+    }
 
     e.nativeEvent.stopPropagation();
     this.context.api.finishChange();
@@ -49,10 +54,10 @@ export default class Knob extends React.Component {
     const f = Math.sqrt((matrix.a ** 2) + (matrix.b ** 2));
 
     const knob = this.props.children || (<g>
-      <circle r={14} fill="transparent" />
-      <circle r={10} fill="white" />
-      <circle r={7} fill="#3a7ed2" />
-    </g>);
+        <circle r={14} fill="transparent"/>
+        <circle r={10} fill="white"/>
+        <circle r={7} fill="#3a7ed2"/>
+      </g>);
     return (<Draggable
       onDragStart={this.handleStartDrag}
       onDrag={this.handleDrag}

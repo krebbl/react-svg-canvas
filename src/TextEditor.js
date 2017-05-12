@@ -107,7 +107,9 @@ export default class TextEditor extends React.Component {
   }
 
   focusEditable(target) {
-    target.focus();
+    if (bowser.ios) {
+      target.focus();
+    }
 
     if (document.createRange && target.lastChild) {
       const range = document.createRange();

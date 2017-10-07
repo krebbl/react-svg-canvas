@@ -62,16 +62,19 @@ export default class TextEditor extends React.Component {
       style.background = 'transparent';
       style.zIndex = '1000';
       style.outline = 'none';
-      style.whiteSpace = !this.props.width && !this.props.maxWidth ? 'nowrap' : 'pre-wrap';
+      style.whiteSpace = this.props.width === 'auto' && !this.props.maxWidth ? 'nowrap' : 'normal';
       style.border = 'none';
-      style.fontSize = `${this.props.fontSize}px`;
       style.wordBreak = 'break-word';
       style.wordWrap = 'break-word'; // for FF
       style.padding = '0';
+      style.minWidth = '5px';
+      style.fontSize = `${this.props.fontSize}px`;
       style.transformOrigin = '0 0';
       style.textRendering = 'geometricPrecision';
       style.color = this.props.fill;
       this._target.setAttribute('contenteditable', 'true');
+      this._target.setAttribute('autocomplete', 'off');
+      this._target.setAttribute('autocorrect', 'off');
 
       this.context.canvas.wrapperNode.appendChild(this._target);
     }
@@ -129,15 +132,37 @@ export default class TextEditor extends React.Component {
 
       if (e.clipboardData) {
         content = (e.originalEvent || e).clipboardData.getData('text/plain');
-        if (this.props.singleLine) {
-          content = content.replace(/\n/, ' ');
-        }
-        document.execCommand('insertText', false, content);
+        document.execCommand('insertText', false, this.cleanText(content));
       }
       else if (window.clipboardData) {
+        const selection = window.getSelection();
         content = window.clipboardData.getData('Text');
+        if (selection.createRange) {
+          selection.createRange().pasteHTML(this.cleanText(content));
+        } else if (selection.getRangeAt && selection.rangeCount) {
+          let range = selection.getRangeAt(0);
+          range.deleteContents();
 
-        document.selection.createRange().pasteHTML(content);
+          // Range.createContextualFragment() would be useful here but is
+          // only relatively recently standardized and is not supported in
+          // some browsers (IE9, for one)
+          const el = document.createElement("div");
+          el.innerHTML = this.cleanText(content);
+          let frag = document.createDocumentFragment(), node, lastNode;
+          while ((node = el.firstChild)) {
+            lastNode = frag.appendChild(node);
+          }
+          range.insertNode(frag);
+
+          // Preserve the selection
+          if (lastNode) {
+            range = range.cloneRange();
+            range.setStartAfter(lastNode);
+            range.collapse(true);
+            selection.removeAllRanges();
+            selection.addRange(range);
+          }
+        }
       }
       setTimeout(() => {
         this.triggerChange();
@@ -151,6 +176,14 @@ export default class TextEditor extends React.Component {
     editable.onblur = () => {
       this.props.onBlur && this.props.onBlur();
     };
+
+    const stopPropagation = function (e) {
+      e.stopPropagation();
+    };
+
+    this._target.onclick = stopPropagation;
+    this._target.onmousedown = stopPropagation;
+    this._target.ontouchstart = stopPropagation;
 
     if (bowser.msie || bowser.msedge) {
       this._textBeforeForIE = editable.innerHTML;
@@ -179,14 +212,20 @@ export default class TextEditor extends React.Component {
           e.target.blur();
           e.stopPropagation();
         }
+        if (e.which === 13 && this.props.singleLine) {
+          e.preventDefault();
+          e.stopPropagation();
+          e.target.blur();
+          return;
+        }
         if (e.which === 13 && !e.shiftKey) {
           e.preventDefault();
 
           e.stopPropagation();
 
-          const selection = window.getSelection();
-          const range = selection.getRangeAt(0);
-          const br = document.createElement('br');
+          var selection = window.getSelection(),
+            range = selection.getRangeAt(0),
+            br = document.createElement('br');
 
           range.deleteContents();
 
@@ -208,9 +247,10 @@ export default class TextEditor extends React.Component {
       }
     } else {
       editable.onkeydown = (e) => {
-        if (e.which === 27) {
-          e.target.blur();
+        if (e.which === 27 || (this.props.singleLine && e.which === 13)) {
+          e.preventDefault();
           e.stopPropagation();
+          e.target.blur();
         }
       }
     }

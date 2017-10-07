@@ -5,25 +5,26 @@ import Element from './Element';
 import TextEditor from './TextEditor';
 import EventListener from 'react-event-listener';
 import MobileTextEditor from './MobileTextEditor';
+import escapeHtml from 'html-escape';
 
-const wrapProperties = ['text', 'fontSize', 'fontFamily', 'verticalAlign', 'lineHeight', 'textAnchor', 'width', 'padding', 'maxWidth', 'maxHeight', 'height'];
-const compareProps = wrapProperties.concat(['bullets', 'padding', 'placeholder', 'placeholderFill', 'fill', 'selected']);
+const wrapProperties = ['text', 'fontSize', 'fontFamily', 'verticalAlign', 'lineHeight', 'maxLines', 'textAnchor', 'width', 'padding', 'maxWidth', 'maxHeight', 'height', 'selected', 'bending'];
+const compareProps = wrapProperties.concat(['padding', 'placeholder', 'placeholderFill', 'fill', 'background']);
 const isFirefox = bowser.firefox;
 const isMSIEdge = bowser.msie || bowser.msedge;
-const textStyle = {whiteSpace: isMSIEdge ? 'pre-wrap' : '', textRendering: 'geometricPrecision', userSelect: 'none', pointerEvents: 'none'};
+const isChrome = bowser.chrome;
+const textStyle = {whiteSpace: isMSIEdge ? 'pre-wrap' : '', textRendering: 'geometricPrecision', userSelect: 'none', cursor: 'default'};
 const isDebug = process.env.NODE_ENV !== 'production' && process.env.DEBUG;
 const textAlignMap = {
   start: 'left',
   middle: 'center',
   end: 'right'
 };
-
+const UNBREAKABLE_WS = String.fromCharCode(160);
 const WRAPPER_FONT_SIZE = 16;
 
 function positionTextNode(textNode, rect, textAnchor, innerWidth) {
   let x = rect.left;
-
-  const y = rect.top - Math.round(textNode.getBBox().y) + Math.round(rect.height) - textNode.getBBox().height;
+  let y = rect.top - Math.round(textNode.getBBox().y);
 
   textNode.setAttributeNS(null, 'text-anchor', textAnchor);
   switch (textAnchor) {
@@ -38,6 +39,32 @@ function positionTextNode(textNode, rect, textAnchor, innerWidth) {
   }
   textNode.setAttributeNS(null, 'x', `${x}`);
   textNode.setAttributeNS(null, 'y', `${y}`);
+}
+
+function baseWidth(nodes, alpha) {
+  return (alpha > 0 ? nodes[nodes.length - 1] : nodes[0]).getBBox().width
+}
+
+function createBendingPath(innerWidth, radius, lineHeight, lineIndex, totalLines, y) {
+  let d = "";
+  const dr = radius > 0 ? totalLines - 1 - lineIndex : -lineIndex;
+  radius += lineHeight * dr;
+  if (radius > 0) {
+    d = `M ${innerWidth * 0.5}, ${radius + y + WRAPPER_FONT_SIZE}
+        m 0, ${radius}
+        a ${radius},${radius} 0 1,1 0,-${radius * 2}
+        a ${radius},${radius} 0 1,1 0,${radius * 2}`;
+  } else {
+    d = `M ${innerWidth * 0.5}, ${radius + y}
+        m 0, ${radius}
+        a ${Math.abs(radius)},${Math.abs(radius)} 0 1,0 0,${-radius * 2}
+        a ${Math.abs(radius)},${Math.abs(radius)} 0 1,0 0,${radius * 2}`;
+  }
+  return d;
+}
+
+function isNumber(e) {
+  return typeof e === 'number';
 }
 
 export class TextRenderer extends React.Component {
@@ -69,7 +96,8 @@ export class TextRenderer extends React.Component {
     textAnchor: PropTypes.oneOf(['start', 'middle', 'end']),
     maxWidth: PropTypes.number,
     lineHeight: PropTypes.number,
-    verticalAlign: PropTypes.oneOf(['top', 'middle', 'bottom'])
+    verticalAlign: PropTypes.oneOf(['top', 'middle', 'bottom']),
+    bending: PropTypes.number
   });
 
   constructor(props, context) {
@@ -83,21 +111,34 @@ export class TextRenderer extends React.Component {
   }
 
   measureText(props, withoutRects) {
-    const scaleFactor = WRAPPER_FONT_SIZE / props.fontSize;
-    const isEditing = this.state && this.state.editing;
+    const realSidePadding = props.padding * 2;
     const options = Object.assign({}, props, {
-      fontSize: WRAPPER_FONT_SIZE,
-      text: props.text || (!isEditing ? props.placeholder : ' '),
-      width: (props.width ? props.width : 0) * scaleFactor,
-      maxWidth: (props.maxWidth ? props.maxWidth : 0) * scaleFactor,
-      textAlign: textAlignMap[props.textAnchor]
+      text: this.cleanText(props.text || (props.editable ? props.placeholder : props.editable ? ' ' : '')),
+      width: (isNumber(props.width) ? props.width - realSidePadding : null),
+      maxWidth: (isNumber(props.maxWidth) ? props.maxWidth - realSidePadding : null),
+      maxHeight: props.maxHeight,
+      height: null
     });
     const measurement = measureText(options, withoutRects);
-    measurement.height /= scaleFactor;
-    measurement.width /= scaleFactor;
+    let bendingRadius = 0;
+    if (measurement.rects.length && Math.abs(props.bending) > 1) {
+      const rect = measurement.rects[props.bending > 0 ? measurement.rects.length - 1 : 0];
+      bendingRadius = 360 / props.bending * rect.width / (Math.PI * 2);
+    }
     return {
+      bendingRadius,
       measurement
     };
+  }
+
+  cleanText(text) {
+    let textContent = text;
+    textContent = textContent == null ? '' : textContent + '';
+    if (this.props.singleLine) {
+      return textContent.replace(/\n/g, ' ');
+    }
+    textContent = textContent.replace(/(\n|\r)\u0020/g, "$1" + UNBREAKABLE_WS);
+    return textContent || '';
   }
 
   measureTextHeight(props) {
@@ -164,7 +205,7 @@ export class TextRenderer extends React.Component {
   }
 
   getBBoxNode() {
-    return this.textBBoxNode;
+    return this.textBBoxNode || this.node;
   }
 
   svgRoot() {
@@ -172,13 +213,14 @@ export class TextRenderer extends React.Component {
   }
 
   wrapText() {
-    const measurement = this.state.measurement;
+    const {text, placeholder, width, fontSize, textAnchor, lineHeight} = this.props;
+    const {bendingRadius, measurement} = this.state;
     const rects = measurement.rects;
     const baseline = measurement.baseline;
-    let textContent = this.props.text || this.props.placeholder;
+    let textContent = this.cleanText(text || placeholder);
     const svgRoot = this.svgRoot();
     const p = svgRoot.createSVGPoint();
-    const innerWidth = (this.props.width ? this.props.width : 0) * (WRAPPER_FONT_SIZE / this.props.fontSize);
+    const innerWidth = (width ? width : 0) * (WRAPPER_FONT_SIZE / fontSize);
 
     if (rects) {
       const measureThreshold = 0.7;
@@ -188,10 +230,10 @@ export class TextRenderer extends React.Component {
       let textNode;
       let num;
       let lastTop = rects[0].top;
-      let lastLineIndex = hardLineIndex;
       let currentLine = hardLines[hardLineIndex];
       let lastTextContent = '';
       let rectIndex = 0;
+      const textLines = [];
       hardLines.forEach((hardLine) => {
         currentLine = hardLine;
         if (rectIndex < rects.length) {
@@ -199,21 +241,24 @@ export class TextRenderer extends React.Component {
             rect = rects[rectIndex];
             textNode = this.textWrapperNode.childNodes[rectIndex];
             textNode.textContent = ' ';
-            positionTextNode(textNode, rect, this.props.textAnchor, innerWidth);
+            textNode.setAttributeNS(null, "dy", '1em');
+            textLines.push(textNode);
+            positionTextNode(textNode, rect, textAnchor, innerWidth);
             rectIndex++;
           } else {
             while (currentLine.length > 0 && rectIndex < rects.length) {
               // prepare text node for measuring
               rect = rects[rectIndex];
               textNode = this.textWrapperNode.childNodes[rectIndex];
+              textNode.setAttributeNS(null, "dy", '1em');
               textNode.removeAttributeNS(null, 'x');
               textNode.removeAttributeNS(null, 'y');
               textNode.removeAttributeNS(null, 'text-anchor');
 
               // if there is a soft break and the hardline is already broken
               // trim all leading white spaces from the current line
-              if (lastTop !== rect.top && currentLine !== hardLine) {
-                if (/\s/.test(lastTextContent.substr(-1)) || isFirefox) {
+              if (lastTop !== rect.top && currentLine !== hardLine && ((isChrome) && textAnchor === 'left' || !(isChrome))) {
+                if (/\s/.test(lastTextContent.substr(-1)) || isFirefox || isMSIEdge) {
                   currentLine = currentLine.replace(/^\s+/, '');
                 }
               }
@@ -252,7 +297,7 @@ export class TextRenderer extends React.Component {
                 currentLine = currentLine.substr(num + 1).replace(/\r$/, '');
               }
               // position text node by text anchor
-              positionTextNode(textNode, rect, this.props.textAnchor, innerWidth);
+              positionTextNode(textNode, rect, textAnchor, innerWidth);
 
               // save last rect top
               lastTop = rect.top;
@@ -261,18 +306,53 @@ export class TextRenderer extends React.Component {
               // move to next measure rect
               rectIndex++;
 
+              if (textNode.textContent) {
+                textLines.push(textNode)
+              }
+
               let nextRect = rects[rectIndex];
               // if the current line is empty
               // and the next rect is on the same line
               // jump over it
               // we don't need to handle it
               if (!currentLine && nextRect && nextRect.top === lastTop) {
+                textNode = this.textWrapperNode.childNodes[rectIndex];
+                textNode.textContent = '';
                 rectIndex++;
               }
             }
           }
         }
       });
+
+      if (bendingRadius && textLines.length) {
+        const defNode = this.defNode;
+        const numHardlines = textLines.length;
+        defNode.innerHTML = "";
+        textLines.forEach((textNode, i) => {
+          if (!textNode.textContent) {
+            return;
+          }
+          const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+          const y = parseFloat(textNode.getAttributeNS(null, 'y'));
+          path.setAttributeNS(null, "d", createBendingPath(innerWidth, bendingRadius, WRAPPER_FONT_SIZE * lineHeight, i, numHardlines, y));
+          const id = "v_tbPath_" + this.props.id + '_' + i;
+          path.setAttributeNS(null, "id", id);
+          const textPath = document.createElementNS("http://www.w3.org/2000/svg", "textPath");
+          textPath.setAttributeNS("http://www.w3.org/1999/xlink", "href", "#" + id);
+          textNode.setAttributeNS(null, "x", 0);
+          textNode.setAttributeNS(null, "y", 0);
+          textNode.removeAttributeNS(null, "dy");
+          textNode.setAttributeNS(null, "dy", bendingRadius > 0 ? '0' : '1em');
+
+          textNode.setAttributeNS(null, "text-anchor", "middle");
+
+          textPath.setAttributeNS(null, "startOffset", "50%");
+          defNode.appendChild(path);
+          textPath.textContent = textNode.textContent;
+          textNode.replaceChild(textPath, textNode.firstChild);
+        });
+      }
 
     }
   }
@@ -307,11 +387,15 @@ export class TextRenderer extends React.Component {
         return <MobileTextEditor {...props}
                                  key={this.props.id}
                                  ref={this.handeTextEditor}
-                                 maxWidth={maxWidth}
+                                 maxWidth={"100%"}
                                  width={width}
                                  onTextChange={this.handleTextChange}
                                  onBlur={this.handleTextBlur}
         />
+      }
+
+      if (this.props.bending) {
+        return null;
       }
 
       const bbox = this.textWrapperNode.firstChild.getBBox();
@@ -377,7 +461,7 @@ export class TextRenderer extends React.Component {
   };
 
   handleTextUp = (e) => {
-    if (!this.state.moving && this.props.editable && this.props.selected) {
+    if (!this.state.moving && this.props.editable && this.props.selected && !this.props.bending) {
       if (e.timeStamp - this.textDownTime < 200) {
         this.setState({editing: true});
       }
@@ -404,19 +488,25 @@ export class TextRenderer extends React.Component {
     this.textBBoxNode = ref;
   };
 
+  handleDefs = (ref) => {
+    this.defNode = ref;
+  };
+
   render() {
+    let {bending, height, width, background, fontFamily, fill, maxWidth, padding, textAnchor, verticalAlign, fontSize} = this.props;
+    const {bendingRadius} = this.state;
     const measurement = this.state.measurement;
     const rects = measurement.rects;
     const calculatedBoxHeight = measurement.height;
-    const height = this.props.height || 0;
-    const width = this.props.width || 0;
+    height = Math.max(height || 0, 0);
+    width = Math.max(width || 0, 0);
 
     if (rects.length === 0) {
       return null;
     }
     let y = 0;
     let x = 0;
-    switch (this.props.verticalAlign) {
+    switch (verticalAlign) {
       case 'top':
         y = 0;
         break;
@@ -432,7 +522,7 @@ export class TextRenderer extends React.Component {
 
     let tx = 0;
     const calculatedBoxWidth = measurement.width;
-    switch (this.props.textAnchor) {
+    switch (textAnchor) {
       case 'start':
         break;
       case 'middle':
@@ -447,22 +537,28 @@ export class TextRenderer extends React.Component {
         break;
     }
 
+    const bboxHeight = isNumber(this.props.height) ? this.props.height : calculatedBoxHeight;
+    const bboxWidth = isNumber(this.props.width) ? this.props.width : calculatedBoxWidth;
+    const scaleFactor = fontSize / WRAPPER_FONT_SIZE;
+
     return (<g
       ref={this.handleNode}
       transform={`translate(0, ${y})`}
     >
       <EventListener target="window" onKeyPress={this.handleKeyPress}/>
-      {<g>
-        <rect
+      <g>
+        {!bendingRadius && <rect
           ref={this.handleTextBBox}
           x={x}
-          width={this.props.width || (measurement.width)}
-          height={measurement.height}
-          fill={this.props.background}
-        />
-      </g>}
-      {<g transform={`translate(${tx}, 0)`}>
-        {isDebug ? <g transform={`scale(${this.props.fontSize / WRAPPER_FONT_SIZE})`}>
+          y={isNumber(this.props.height) ? 0 : y}
+          width={bboxWidth}
+          height={bboxHeight}
+          fill={background}
+        />}
+      </g>
+      <defs ref={this.handleDefs}/>
+      <g transform={`translate(${tx}, 0)`}>
+        {isDebug ? <g transform={`scale(${scaleFactor})`}>
           {rects.map((line, i) => {
             return <rect
               key={`${i}'_'${line.left}`}
@@ -473,15 +569,15 @@ export class TextRenderer extends React.Component {
             />;
           })}
         </g> : null}
-        <g ref={this.handleTextWrapperRef} transform={`scale(${this.props.fontSize / WRAPPER_FONT_SIZE})`}>
+        <g ref={this.handleTextWrapperRef} transform={`scale(${scaleFactor})`}>
           {rects.map((line, i) => {
             return <text
-              key={`${i}'_'${line.left}`} xmlSpace="preserve" style={textStyle} fontFamily={this.props.fontFamily} fontSize={WRAPPER_FONT_SIZE}
-              dy="1em" fill={this.state.editing ? 'transparent' : this.props.fill}
+              key={`${i}'_'${line.left}`} xmlSpace="preserve" style={textStyle} fontFamily={fontFamily} fontSize={WRAPPER_FONT_SIZE}
+              dy="1em" fill={this.state.editing ? 'transparent' : fill}
             />;
           })}
         </g>
-      </g>}
+      </g>
     </g>);
   }
 
@@ -491,6 +587,7 @@ export default Element.createClass(TextRenderer);
 
 
 let divWrapper;
+
 function createDivWrapper() {
   const outerOutsideWrapper = document.createElement('div');
   outerOutsideWrapper.style.position = 'absolute';
@@ -525,41 +622,63 @@ function createDivWrapper() {
   return ret;
 }
 
+function prepareOptions(options) {
+  const ret = Object.assign({
+    lineHeight: 1.3
+  }, options);
+  if (isNumber(ret.maxLines)) {
+    ret.maxHeight = ret.lineHeight * ret.fontSize * (ret.maxLines + 0.5);
+  }
+
+  return ret;
+}
+
 function prepareDivWrapper(options) {
   const scaleFactor = WRAPPER_FONT_SIZE / options.fontSize;
-  const {text, fontFamily, maxWidth, width, maxHeight, textAnchor, lineHeight} = options;
+  let {text, fontFamily, maxWidth, maxHeight, width, textAnchor, lineHeight} = options;
   divWrapper = divWrapper || createDivWrapper();
   divWrapper.innerHTML = '';
   divWrapper.style.fontFamily = fontFamily;
-  divWrapper.style.whiteSpace = !width && !maxWidth ? 'nowrap' : 'pre-wrap';
+  divWrapper.style.whiteSpace = !width && !maxWidth ? 'nowrap' : 'normal';
   divWrapper.style.lineHeight = lineHeight || 1.3;
   divWrapper.style.fontSize = `${WRAPPER_FONT_SIZE}px`;
-  divWrapper.style.width = width ? `${width * scaleFactor}px` : 'auto';
-  divWrapper.style.maxWidth = maxWidth ? `${maxWidth * scaleFactor}px` : 'none';
-  divWrapper.style.maxHeight = maxHeight ? `${maxHeight * scaleFactor}px` : 'none';
+  divWrapper.style.width = isNumber(width) ? `${width * scaleFactor}px` : 'auto';
+  divWrapper.style.maxWidth = isNumber(maxWidth) ? `${Math.max(maxWidth, 0) * scaleFactor}px` : 'none';
+  divWrapper.style.maxHeight = isNumber(maxHeight) ? `${Math.max(maxHeight, 0) * scaleFactor}px` : 'none';
   divWrapper.style.textAlign = textAlignMap[textAnchor];
-  let innerText = (text == null ? '' : text + '').replace(/\n$/, isMSIEdge ? '\n&nbsp;' : '\n\n').replace(/\r?\n/gi, '<br/>');
-  if (divWrapper.style.whiteSpace === 'nowrap') {
-    innerText = innerText.replace(/\s/g, '&nbsp;');
+  if (/^\n+$/.test(text)) {
+    text = ' ' + text;
   }
+  let innerText = escapeHtml(text == null ? '' : text + '').replace(/\n$/, isMSIEdge ? '\n&nbsp;' : '\n\n').replace(/\r?\n/gi, '<br/>');
+  innerText = innerText.replace(/\s(?=\s)/g, '&nbsp;').replace(/^\s|\s$/g, '&nbsp;');
   divWrapper.innerHTML = `<span>${innerText}</span>`;
 
   return divWrapper;
 }
 
 function measureText(options, withoutRects) {
-  const scaleFactor = WRAPPER_FONT_SIZE / options.fontSize;
-  divWrapper = prepareDivWrapper(options);
-  const rects = divWrapper.firstChild.getClientRects();
+  const preparedOptions = prepareOptions(options);
+  divWrapper = prepareDivWrapper(preparedOptions);
+  const scaleFactor = WRAPPER_FONT_SIZE / preparedOptions.fontSize;
+  let rects = divWrapper.firstChild.getClientRects();
   const topRect = divWrapper.getBoundingClientRect();
   const firstLineOffset = (rects.length ? rects[0].top - topRect.top : 0);
   const baseline = (rects.length ? rects[0].bottom - topRect.top : 0);
   let width = topRect.width;
-  [].forEach.call(rects, (rect) => {
+  const maxWidth = options.maxWidth ? options.maxWidth * scaleFactor : 0;
+  Array.prototype.forEach.call(rects, (rect) => {
     width = Math.max(rect.width, width);
   });
+  if (maxWidth && maxWidth < width) {
+    const index = Array.prototype.findIndex.call(rects, (rect) => {
+      return rect.width > maxWidth;
+    });
+    if (index > -1) {
+      rects = Array.prototype.slice.call(rects, 0, index);
+    }
+  }
 
-  let retRects = [].map.call(rects, (rect) => {
+  let retRects = Array.prototype.map.call(rects, (rect) => {
     return {
       left: (rect.left - topRect.left),
       top: (rect.top - topRect.top - firstLineOffset),
@@ -570,22 +689,38 @@ function measureText(options, withoutRects) {
     };
   });
   let height = (divWrapper.offsetHeight - (2 * firstLineOffset));
-  const optionHeight = options.maxHeight || options.height;
+  let outerHeight = height;
+
+  const optionHeight = preparedOptions.maxHeight || preparedOptions.height;
+  let hasOverflow = false;
   if (optionHeight) {
-    const maxHeight = optionHeight * scaleFactor;
+    outerHeight = retRects.length ? retRects[retRects.length - 1].top + retRects[retRects.length - 1].height : 0;
+    const maxHeight = Math.round((optionHeight * scaleFactor) * 100) / 100;
     retRects = retRects.filter(rect => {
-      const fitsIn = rect.top + rect.height + 2 * firstLineOffset < maxHeight;
+      const fitsIn = rect.top + rect.height <= maxHeight;
       height = fitsIn ? rect.top + rect.height : height;
+      hasOverflow = hasOverflow || !fitsIn;
       return fitsIn;
     });
+  }
+  let outerWidth = width;
+  if (maxWidth) {
+    let maxWidth = 0;
+    retRects.forEach((rect) => {
+      maxWidth = Math.max(rect.width, maxWidth);
+    });
+    width = maxWidth;
   }
 
   return {
     width: width / scaleFactor,
     height: height / scaleFactor,
     firstLineOffset: firstLineOffset,
-    firstLineHeight: (rects[0].height) / scaleFactor,
+    firstLineHeight: rects.length ? (rects[0].height) / scaleFactor : 0,
     baseline: baseline,
-    rects: retRects
+    rects: retRects,
+    outerHeight: outerHeight / scaleFactor,
+    outerWidth: outerWidth / scaleFactor,
+    hasOverflow
   };
 }

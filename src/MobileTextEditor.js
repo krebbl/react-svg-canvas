@@ -33,7 +33,7 @@ export default class MobileTextEditor extends TextEditor {
       style.outline = 'none';
       style.whiteSpace = !this.props.width && !this.props.maxWidth ? 'nowrap' : 'pre-wrap';
       style.border = 'none';
-      style.fontSize = `${this.props.fontSize}px`;
+      style.fontSize = `${24}px`;
       style.overflow = style.whiteSpace === 'nowrap' ? 'hidden' : 'inherit';
       style.wordBreak = 'break-word';
       style.wordWrap = 'break-word'; // for FF

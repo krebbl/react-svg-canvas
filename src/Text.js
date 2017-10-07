@@ -12,7 +12,7 @@ const compareProps = wrapProperties.concat(['padding', 'placeholder', 'placehold
 const isFirefox = bowser.firefox;
 const isMSIEdge = bowser.msie || bowser.msedge;
 const isChrome = bowser.chrome;
-const textStyle = {whiteSpace: isMSIEdge ? 'pre-wrap' : '', textRendering: 'geometricPrecision', userSelect: 'none', cursor: 'default'};
+const textStyle = {whiteSpace: isMSIEdge ? 'pre-wrap' : '', textRendering: 'geometricPrecision', userSelect: 'none', cursor: 'default', pointerEvents: 'none'};
 const isDebug = process.env.NODE_ENV !== 'production' && process.env.DEBUG;
 const textAlignMap = {
   start: 'left',

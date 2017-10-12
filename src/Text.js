@@ -112,8 +112,9 @@ export class TextRenderer extends React.Component {
 
   measureText(props, withoutRects) {
     const realSidePadding = props.padding * 2;
+    const isEditing = this.state && this.state.editing;
     const options = Object.assign({}, props, {
-      text: this.cleanText(props.text || (props.editable ? props.placeholder : props.editable ? ' ' : '')),
+      text: this.cleanText(props.text || (!isEditing ? props.placeholder : ' ')),
       width: (isNumber(props.width) ? props.width - realSidePadding : null),
       maxWidth: (isNumber(props.maxWidth) ? props.maxWidth - realSidePadding : null),
       maxHeight: props.maxHeight,

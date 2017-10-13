@@ -232,6 +232,43 @@ export default class Canvas extends React.Component {
           api.redo();
         }
       }
+      let dx = 0;
+      let dy = 0;
+      switch (e.which) {
+        case 37: // left
+          dx = -1;
+          break;
+        case 38: // up
+          dy = -1;
+          break;
+        case 39: // right
+          dx = 1;
+          break;
+        case 40: // down
+          dy = 1;
+          break;
+        default:
+          return; // exit this handler for other keys
+      }
+      if (dx || dy) {
+        if (!this._moveKeyDown) {
+          api.startChange();
+          this._moveKeyDown = true;
+        }
+        const elements = api.getSelectedElements();
+        elements.forEach((element) => {
+          api.updateElement(element.id, 'x', element.x + dx);
+          api.updateElement(element.id, 'y', element.y + dy);
+          api.triggerDataChange();
+        });
+      }
+    }
+  };
+
+  handleKeyUp = () => {
+    if (this._moveKeyDown) {
+      this._moveKeyDown = false;
+      this.props.api.finishChange();
     }
   };
 
@@ -300,6 +337,7 @@ export default class Canvas extends React.Component {
         onResize={this.handleResize}
         onOrientationChange={this.handleResize}
         onKeyDown={this.handleKeyDown}
+        onKeyUp={this.handleKeyUp}
       />
       <svg
         xmlns="http://www.w3.org/2000/svg" version="1.1"

@@ -41,10 +41,6 @@ function positionTextNode(textNode, rect, textAnchor, innerWidth, measurement, s
   textNode.setAttributeNS(null, 'y', `${y}`);
 }
 
-function baseWidth(nodes, alpha) {
-  return (alpha > 0 ? nodes[nodes.length - 1] : nodes[0]).getBBox().width
-}
-
 function createBendingPath(innerWidth, radius, lineHeight, lineIndex, totalLines, y) {
   let d = "";
   const dr = radius > 0 ? totalLines - 1 - lineIndex : -lineIndex;
@@ -138,7 +134,7 @@ export class TextRenderer extends React.Component {
     if (this.props.singleLine) {
       return textContent.replace(/\n/g, ' ');
     }
-    textContent = textContent.replace(/(\n|\r)\u0020/g, "$1" + UNBREAKABLE_WS);
+    textContent = textContent.replace(/(\n|\r)\u0020/g, "$1" + UNBREAKABLE_WS).replace(/\s(?=\s)/g, UNBREAKABLE_WS).replace(/^\s|\s$/g, UNBREAKABLE_WS);
     return textContent || '';
   }
 

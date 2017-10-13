@@ -22,9 +22,9 @@ const textAlignMap = {
 const UNBREAKABLE_WS = String.fromCharCode(160);
 const WRAPPER_FONT_SIZE = 16;
 
-function positionTextNode(textNode, rect, textAnchor, innerWidth) {
+function positionTextNode(textNode, rect, textAnchor, innerWidth, measurement, scaleFactor) {
   let x = rect.left;
-  let y = rect.top - Math.round(textNode.getBBox().y);
+  let y = rect.top - Math.round(textNode.getBBox().y) + scaleFactor * measurement.firstLineHeight - textNode.getBBox().height;
 
   textNode.setAttributeNS(null, 'text-anchor', textAnchor);
   switch (textAnchor) {
@@ -221,7 +221,8 @@ export class TextRenderer extends React.Component {
     let textContent = this.cleanText(text || placeholder);
     const svgRoot = this.svgRoot();
     const p = svgRoot.createSVGPoint();
-    const innerWidth = (width ? width : 0) * (WRAPPER_FONT_SIZE / fontSize);
+    const scaleFactor = (WRAPPER_FONT_SIZE / fontSize);
+    const innerWidth = (width ? width : 0) * scaleFactor;
 
     if (rects) {
       const measureThreshold = 0.7;
@@ -244,7 +245,7 @@ export class TextRenderer extends React.Component {
             textNode.textContent = ' ';
             textNode.setAttributeNS(null, "dy", '1em');
             textLines.push(textNode);
-            positionTextNode(textNode, rect, textAnchor, innerWidth);
+            positionTextNode(textNode, rect, textAnchor, innerWidth, measurement, scaleFactor);
             rectIndex++;
           } else {
             while (currentLine.length > 0 && rectIndex < rects.length) {
@@ -298,7 +299,7 @@ export class TextRenderer extends React.Component {
                 currentLine = currentLine.substr(num + 1).replace(/\r$/, '');
               }
               // position text node by text anchor
-              positionTextNode(textNode, rect, textAnchor, innerWidth);
+              positionTextNode(textNode, rect, textAnchor, innerWidth, measurement, scaleFactor);
 
               // save last rect top
               lastTop = rect.top;

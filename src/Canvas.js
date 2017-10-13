@@ -251,6 +251,9 @@ export default class Canvas extends React.Component {
           return; // exit this handler for other keys
       }
       if (dx || dy) {
+        e.stopPropagation();
+        e.preventDefault();
+
         if (!this._moveKeyDown) {
           api.startChange();
           this._moveKeyDown = true;

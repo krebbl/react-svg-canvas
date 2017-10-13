@@ -1,6 +1,7 @@
 import React, {PropTypes} from 'react';
 import bowser from 'bowser';
 import EventListener, {withOptions} from 'react-event-listener';
+import escapeHtml from 'html-escape';
 
 const wrapProperties = ['text', 'fontFamily', 'verticalAlign', 'lineHeight', 'textAlign', 'width'];
 
@@ -88,19 +89,21 @@ export default class TextEditor extends React.Component {
     this.focusEditable(target);
   }
 
-  setInnerText (editable, text) {
-    if (text !== editable.textContent) {
-      editable.innerHTML = `<span>${text.replace(/\n$/, '\n\n').replace(/\r?\n/gi, '<br/>')}</span>`;
+  setInnerText (target, text) {
+    if (!text) {
+      target.innerHTML = '<br/>';
+    } else {
+      target.innerHTML = `<span>${escapeHtml(text).replace(/\n$/, '\n\n').replace(/\r?\n/gi, '<br/>').replace(/\s(?=\s)/g, '&nbsp;').replace(/^\s|\s$/g, '&nbsp;')}</span>`;
     }
   }
 
-  getInnerText (editable) {
-    if (!editable) {
+  getInnerText (target) {
+    if (!target) {
       return '';
     }
-    let innerText = editable.innerText.replace(/^\n$/, '');
+    let innerText = target.innerText.replace(/^\n$/, '');
     if (bowser.msie || bowser.msedge) {
-      if (editable.lastChild && editable.lastChild.lastChild && editable.lastChild.lastChild.tagName === 'BR') {
+      if (target.lastChild && target.lastChild.lastChild && target.lastChild.lastChild.tagName === 'BR') {
         innerText += '\n';
       }
     } else {

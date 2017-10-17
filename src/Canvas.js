@@ -1,6 +1,7 @@
 import React, {PropTypes} from 'react';
 import EventListener from 'react-event-listener';
 import bowser from 'bowser';
+import KeyCode from 'key-code';
 import Api from './Api';
 
 const snapLinesStyle = {pointerEvents: 'none'};
@@ -220,50 +221,59 @@ export default class Canvas extends React.Component {
   handleKeyDown = (e) => {
     const api = this.props.api;
     if (!/input|textarea/gi.test(e.target.tagName) && !e.target.getAttribute('contenteditable')) {
-      if (e.which === 8 || e.which === 46) {
+      const ctrlKey = (bowser.mac && e.metaKey) || !bowser.mac && e.ctrlKey;
+
+      if (e.which === KeyCode.BACKSPACE || e.which === KeyCode.DELETE) {
         api.removeSelectedElements();
         api.triggerDataChange();
         api.triggerSelectionChange();
-      } else if (e.which === 90 && e.metaKey) {
+      } else if (e.which === KeyCode.Z && e.metaKey) {
         e.preventDefault();
         if (!e.shiftKey) {
           api.undo();
         } else {
           api.redo();
         }
-      }
-      let dx = 0;
-      let dy = 0;
-      switch (e.which) {
-        case 37: // left
-          dx = -1;
-          break;
-        case 38: // up
-          dy = -1;
-          break;
-        case 39: // right
-          dx = 1;
-          break;
-        case 40: // down
-          dy = 1;
-          break;
-        default:
-          return; // exit this handler for other keys
-      }
-      if (dx || dy) {
-        e.stopPropagation();
-        e.preventDefault();
-
-        if (!this._moveKeyDown) {
-          api.startChange();
-          this._moveKeyDown = true;
+      } else if(e.which === KeyCode.C && ctrlKey) {
+        api.copySelectedElements();
+      } else if(e.which === KeyCode.X && ctrlKey) {
+        api.cutSelectedElements();
+      } else if(e.which === KeyCode.V && ctrlKey) {
+        api.pasteClipboard();
+      } else {
+        let dx = 0;
+        let dy = 0;
+        switch (e.which) {
+          case 37: // left
+            dx = -1;
+            break;
+          case 38: // up
+            dy = -1;
+            break;
+          case 39: // right
+            dx = 1;
+            break;
+          case 40: // down
+            dy = 1;
+            break;
+          default:
+            return; // exit this handler for other keys
         }
-        const elements = api.getSelectedElements();
-        elements.forEach((element) => {
-          api.updateElement(element.id, 'x', element.x + dx);
-          api.updateElement(element.id, 'y', element.y + dy);
-          api.triggerDataChange();
-        });
+        if (dx || dy) {
+          e.stopPropagation();
+          e.preventDefault();
+
+          if (!this._moveKeyDown) {
+            api.startChange();
+            this._moveKeyDown = true;
+          }
+          const elements = api.getSelectedElements();
+          elements.forEach((element) => {
+            api.updateElement(element.id, 'x', element.x + dx);
+            api.updateElement(element.id, 'y', element.y + dy);
+            api.triggerDataChange();
+          });
+        }
       }
     }
   };

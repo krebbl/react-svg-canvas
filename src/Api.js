@@ -348,16 +348,36 @@ export default class Api extends EventDispatcher {
     return this.addElement(mutable, key, parent.id, true);
   }
 
-  // copySelectedElements() {
-  //   this.clipboard = Object.keys(this.selection).map(id => this.getElement(id)).filter(el => !!el).map(el => el.asMutable());
-  // }
-  //
-  // pasteElement() {
-  //   this.clipboard.forEach((element) => {
-  //     const {_factory,_key, _parentId, ...other} = this.clipboard;
-  //     this.addElement(_factory, other, _key, _parentId, true);
-  //   });
-  // }
+  copySelectedElements() {
+    this.clipboard = Object.keys(this.selection).map(id => this.getElement(id)).filter(el => !!el);
+  }
+
+  cutSelectedElements() {
+    this.copySelectedElements();
+    this.removeSelectedElements();
+  }
+
+  pasteClipboard() {
+    if (this.clipboard) {
+      if (this.listens('paste')) {
+        this.emit('paste', {clipboard: this.clipboard, target: this});
+      } else {
+        this.startChange();
+        let newElement;
+        this.clipboard.forEach((element, i) => {
+          const {_factory, _key, _parentId, ...other} = element;
+          const path = this.getDataPath(element.id);
+          newElement = this.addElement(Object.assign({}, other), path, _parentId, true);
+        });
+
+        if (newElement) {
+          this.selectElement(newElement.id, false);
+        };
+
+        this.finishChange();
+      }
+    }
+  }
 
   cloneSelectedElements() {
     this.startChange();

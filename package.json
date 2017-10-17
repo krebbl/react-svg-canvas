@@ -119,6 +119,7 @@
     "deep-equal": "^1.0.1",
     "eventdispatcher": "^2.5.1",
     "html-escape": "^2.0.0",
+    "key-code": "^0.0.1",
     "object-diff": "0.0.4",
     "react-addons-shallow-compare": "^15.4.2",
     "react-contenteditable": "^2.0.2",

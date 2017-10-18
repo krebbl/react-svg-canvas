@@ -134,7 +134,7 @@ export class TextRenderer extends React.Component {
     if (this.props.singleLine) {
       return textContent.replace(/\n/g, ' ');
     }
-    textContent = textContent.replace(/(\n|\r)\u0020/g, "$1" + UNBREAKABLE_WS).replace(/\s(?=\s)/g, UNBREAKABLE_WS).replace(/^\s|\s$/g, UNBREAKABLE_WS);
+    textContent = textContent.replace(/(\n|\r)\u0020/g, "$1" + UNBREAKABLE_WS).replace(/[\u0020](?=[\u0020])/g, UNBREAKABLE_WS).replace(/^[\u0020]|[\u0020]$/g, UNBREAKABLE_WS);
     return textContent || '';
   }
 
